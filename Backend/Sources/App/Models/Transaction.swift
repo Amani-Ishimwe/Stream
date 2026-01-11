@@ -1,0 +1,42 @@
+@preconcurrency import Fluent
+import Vapor
+
+final class Transaction: Model, Content, @unchecked Sendable {
+    static let schema = "transactions"
+
+    @ID(key: .id)
+    var id: UUID?
+
+    @Parent(key: "user_id")
+    var user: User
+
+    @Field(key: "type")
+    var type: String // SEND, RECEIVE, TOPUP, WITHDRAW
+
+    @Field(key: "amount")
+    var amount: Double
+    
+    @Field(key: "description")
+    var description: String?
+    
+    @Field(key: "counterparty")
+    var counterparty: String?
+    
+    @Field(key: "status")
+    var status: String
+
+    @Timestamp(key: "created_at", on: .create)
+    var createdAt: Date?
+
+    init() { }
+
+    init(id: UUID? = nil, userID: User.IDValue, type: String, amount: Double, description: String? = nil, counterparty: String? = nil, status: String = "Completed") {
+        self.id = id
+        self.$user.id = userID
+        self.type = type
+        self.amount = amount
+        self.description = description
+        self.counterparty = counterparty
+        self.status = status
+    }
+}
