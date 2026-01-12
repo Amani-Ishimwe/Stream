@@ -1,7 +1,15 @@
-//
-//  .gitignore
-//  Tunga
-//
-//  Created by Amani on 12/12/25.
-//
+# Swift / SPM
+.build/
+Packages/
+DerivedData/
+
+# Xcode
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcuserdata/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
 
