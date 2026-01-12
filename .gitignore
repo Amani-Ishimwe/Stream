@@ -1,15 +1,11 @@
-# Swift / SPM
+# Swift / Vapor
 .build/
 Packages/
 DerivedData/
-
-# Xcode
-*.xcodeproj/project.xcworkspace/xcuserdata/
-*.xcuserdata/
+.swiftpm/
+*.xcodeproj
+*.xcworkspace
 
 # macOS
 .DS_Store
-
-# Logs
-*.log
 
