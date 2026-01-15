@@ -17,24 +17,25 @@ struct UserController: RouteCollection, Sendable {
     private func getUser(req: Request) async throws -> User {
         let payload = try req.auth.require(UserPayload.self)
         
-        guard let user = try await User.find(UUID(uuidString: payload.subject.value), on: req.db) else {
+        guard let user = try await User.find(UUID(uuidString: payload.sub.value), on: req.db) else {
             throw Abort(.unauthorized, reason: "User not found")
         }
         return user
     }
     
-    @Sendable func getProfile(req: Request) async throws -> UserProfileResponse {
+    @Sendable func getProfile(req: Request) async throws -> StreamResponse<UserProfileResponse> {
         let user = try await getUser(req: req)
-        return UserProfileResponse(
+        let profile = UserProfileResponse(
             id: user.id!,
             name: user.name,
             email: user.email,
             phone: user.phone,
             balance: user.balance
         )
+        return StreamResponse(success: true, data: profile)
     }
     
-    @Sendable func updateProfile(req: Request) async throws -> MessageResponse {
+    @Sendable func updateProfile(req: Request) async throws -> StreamResponse<EmptyResponse> {
         let user = try await getUser(req: req)
         let input = try req.content.decode(UpdateProfileRequest.self)
         
@@ -42,9 +43,9 @@ struct UserController: RouteCollection, Sendable {
         user.phone = input.phone
         try await user.save(on: req.db)
         
-        return MessageResponse(message: "Profile updated successfully")
+        return StreamResponse(success: true, message: "Profile updated successfully")
     }
-    @Sendable func changePin(req: Request) async throws -> MessageResponse {
+    @Sendable func changePin(req: Request) async throws -> StreamResponse<EmptyResponse> {
         let user = try await getUser(req: req)
         let input = try req.content.decode(ChangePinRequest.self)
         
@@ -59,7 +60,7 @@ struct UserController: RouteCollection, Sendable {
         user.pin = input.newPin
         try await user.save(on: req.db)
         
-        return MessageResponse(message: "PIN changed successfully")
+        return StreamResponse(success: true, message: "PIN changed successfully")
     }
 }
 

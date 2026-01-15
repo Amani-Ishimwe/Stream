@@ -5,9 +5,25 @@ import JWT
 
 // configures your application
 public func configure(_ app: Application) async throws {
-    // uncomment to serve files from /Public folder
-    // app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
+    // Middleware
+    app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
+    app.middleware.use(ErrorMiddleware.default(environment: app.environment))
+    
+    // Request Logging
+    app.middleware.use(AppLoggerMiddleware()) // Custom logger
+    
+    // JSON Strategy
+    let encoder = JSONEncoder()
+    encoder.keyEncodingStrategy = .convertToSnakeCase
+    encoder.dateEncodingStrategy = .iso8601
+    ContentConfiguration.global.use(encoder: encoder, for: .json)
+    
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+    decoder.dateDecodingStrategy = .iso8601
+    ContentConfiguration.global.use(decoder: decoder, for: .json)
 
+    // Database
     app.databases.use(.postgres(
         hostname: Environment.get("DB_HOST") ?? "localhost",
         port: Environment.get("DB_PORT").flatMap(Int.init(_:)) ?? 5432,
@@ -16,12 +32,23 @@ public func configure(_ app: Application) async throws {
         database: Environment.get("DB_NAME") ?? "TUngaDB"
     ), as: .psql)
 
+    // Migrations
     app.migrations.add(CreateUser())
     app.migrations.add(CreateTransaction())
     app.migrations.add(CreateNewsArticle())
+    app.migrations.add(CreateNotification()) // [NEW]
+    app.migrations.add(CreateInstitution()) // [NEW]
+    app.migrations.add(AddInstitutionFieldsToTransaction())
+    app.migrations.add(CreateLinkedAccount())
+    app.migrations.add(AddIsFrozenToLinkedAccount()) // [NEW]
     
     // Auto-migrate for demo purposes
-    try await app.autoMigrate()
+    // Auto-migrate in development
+    if app.environment == .development {
+        try await app.autoMigrate()
+    } else {
+        try await app.autoMigrate() // Keep original behavior for non-dev if not explicitly removed
+    }
     
     // Seed data
     try await SeedData.seed(on: app.db)

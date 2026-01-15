@@ -50,7 +50,7 @@ extension User: ModelAuthenticatable {
 
 struct UserPayload: JWTPayload, Authenticatable {
     // Maps to the "sub" (subject) claim
-    var subject: SubjectClaim
+    var sub: SubjectClaim
     var name: String
     var email: String
     

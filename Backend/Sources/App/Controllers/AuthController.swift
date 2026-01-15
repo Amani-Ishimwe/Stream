@@ -13,7 +13,7 @@ struct AuthController: RouteCollection, Sendable {
     }
 
     // MARK: - Signup
-    @Sendable func signup(req: Request) async throws -> SignupResponse {
+    @Sendable func signup(req: Request) async throws -> StreamResponse<SignupResponse> {
         try SignupRequest.validate(content: req)
         let input = try req.content.decode(SignupRequest.self)
         
@@ -34,47 +34,42 @@ struct AuthController: RouteCollection, Sendable {
             phone: input.phone,
             pin: input.pin,
             passwordHash: hashedPassword,
-            balance: 1000.0 // Starting balance
+            balance: 100000.0 // Starting balance in RWF
         )
         
         try await user.save(on: req.db)
-        return SignupResponse(message: "Account created successfully!")
+        return StreamResponse(success: true, message: "Account created successfully!", data: SignupResponse(message: "Success"))
     }
 
     // MARK: - Login
-    @Sendable func login(req: Request) async throws -> LoginResponse {
-        // 1. Decode the login request from JSON body
+    @Sendable func login(req: Request) async throws -> StreamResponse<LoginResponse> {
         let loginRequest = try req.content.decode(LoginRequest.self)
         
-        // 2. Find the user by email
         guard let user = try await User.query(on: req.db)
             .filter(\.$email == loginRequest.email)
             .first() else {
                 throw Abort(.unauthorized, reason: "Invalid email or password")
             }
         
-        // 3. Verify the Bcrypt password hash
         let isPasswordCorrect = try Bcrypt.verify(loginRequest.password, created: user.passwordHash)
         guard isPasswordCorrect else {
             throw Abort(.unauthorized, reason: "Invalid email or password")
         }
         
-        // 4. Generate JWT Token
         let payload = UserPayload(
-            subject: .init(value: user.id!.uuidString),
+            sub: .init(value: user.id!.uuidString),
             name: user.name,
             email: user.email
         )
         
         let token = try req.jwt.sign(payload)
-        return LoginResponse(token: token)
+        return StreamResponse(success: true, message: "Login successful", data: LoginResponse(token: token))
     }
 
     // MARK: - Forgot Password
-    @Sendable func forgotPassword(req: Request) async throws -> ForgotPasswordResponse {
+    @Sendable func forgotPassword(req: Request) async throws -> StreamResponse<ForgotPasswordResponse> {
         let input = try req.content.decode(ForgotPasswordRequest.self)
-        // Simulate sending email logic here
-        return ForgotPasswordResponse(message: "If an account exists for \(input.email), you will receive a reset link shortly.")
+        return StreamResponse(success: true, message: "If an account exists for \(input.email), you will receive a reset link shortly.", data: ForgotPasswordResponse(message: "Sent"))
     }
 }
 

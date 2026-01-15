@@ -7,7 +7,7 @@ struct NewsController: RouteCollection, Sendable {
         news.get(use: getNews)
     }
 
-    @Sendable func getNews(req: Request) async throws -> [NewsArticle] {
+    @Sendable func getNews(req: Request) async throws -> StreamResponse<[NewsArticle]> {
         let articles = try await NewsArticle.query(on: req.db)
             .sort(\.$publishedAt, .descending)
             .all()
@@ -22,9 +22,9 @@ struct NewsController: RouteCollection, Sendable {
             for article in seed {
                 try await article.save(on: req.db)
             }
-            return seed
+            return StreamResponse(success: true, data: seed)
         }
         
-        return articles
+        return StreamResponse(success: true, data: articles)
     }
 }

@@ -4,51 +4,72 @@ import Vapor
 struct SeedData {
     static func seed(on db: Database) async throws {
         // 1. Seed Users
-        let count = try await User.query(on: db).count()
-        guard count == 0 else { return }
+        var demoUser: User
+        if let existing = try await User.query(on: db).first() {
+            demoUser = existing
+        } else {
+            let passwordHash = try Bcrypt.hash("password123")
+            demoUser = User(
+                name: "Amani Ishimwe",
+                email: "amani@example.com",
+                phone: "+250 788 000 000",
+                pin: "123456",
+                passwordHash: passwordHash,
+                balance: 0.0 // Balance is now aggregated from LinkedAccounts
+            )
+            try await demoUser.save(on: db)
+        }
         
-        let passwordHash = try Bcrypt.hash("password123")
-        let demoUser = User(
-            name: "Amani Ishimwe",
-            email: "amani@example.com",
-            phone: "+256 700 000 000",
-            pin: "123456",
-            passwordHash: passwordHash,
-            balance: 4850.50
-        )
-        try await demoUser.save(on: db)
+        // 2. Seed News
+        let newsCount = try await NewsArticle.query(on: db).count()
+        if newsCount == 0 {
+             let news = [
+                NewsArticle(title: "Rwandan Franc STABLE vs Dollar", summary: "BNR reports stable exchange rates for the third consecutive quarter.", source: "The New Times", imageUrl: "https://images.unsplash.com/photo-1580519542036-c47de6196ba5?w=400"),
+                NewsArticle(title: "Mobile Money Tax Waived", summary: "Government announces tax waiver on mobile money transactions below 5000 RWF.", source: "Igihe", imageUrl: "https://images.unsplash.com/photo-1556742049-0cfed4f7a07d?w=400"),
+                NewsArticle(title: "Kigali IFC Grows", summary: "Kigali International Financial Centre attracts 50 new fintech startups.", source: "CNBC Africa", imageUrl: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=400")
+            ]
+            try await news.create(on: db)
+        }
         
-        // 2. Seed News (More diverse articles)
-        let news = [
-            NewsArticle(title: "Global Markets Rally on Tech Earnings", summary: "Tech stocks see a significant boost after quarterly reports exceed expectations. Major indices reach new highs.", source: "Finance Daily", imageUrl: "https://images.unsplash.com/photo-1611974715853-288ee8766a51?w=400"),
-            NewsArticle(title: "Digital Wallets Adoption Surges Globally", summary: "Mobile payment adoption has reached an all-time high this year, with over 2 billion active users worldwide.", source: "Tech Crunch", imageUrl: "https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=400"),
-            NewsArticle(title: "New Crypto Regulations Announced", summary: "Central banks discuss unified framework for digital assets. New guidelines expected to boost institutional adoption.", source: "CoinDesk", imageUrl: "https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=400"),
-            NewsArticle(title: "AI Transforms Financial Services", summary: "Machine learning algorithms are revolutionizing fraud detection and personalized banking experiences.", source: "FinTech Weekly", imageUrl: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=400"),
-            NewsArticle(title: "Sustainable Investing Reaches Record Levels", summary: "ESG funds attract unprecedented capital as investors prioritize environmental and social impact.", source: "Bloomberg", imageUrl: "https://images.unsplash.com/photo-1466611653911-95081537e5b7?w=400"),
-            NewsArticle(title: "Central Banks Consider Digital Currencies", summary: "Multiple countries pilot central bank digital currencies (CBDCs) to modernize payment systems.", source: "Reuters", imageUrl: "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=400")
-        ]
-        try await news.create(on: db)
+        // 3. Seed Institutions (STRICT RWANDA LIST)
+        let institutionsCount = try await Institution.query(on: db).count()
+        if institutionsCount == 0 {
+            let institutions = [
+                // Mobile Money
+                Institution(name: "MTN MoMo", type: "MOBILE_MONEY", iconSymbol: "iphone.gen3", primaryColorHex: "#FFCC00"),
+                Institution(name: "Airtel Money", type: "MOBILE_MONEY", iconSymbol: "antenna.radiowaves.left.and.right", primaryColorHex: "#FF0000"),
+                
+                // Banks
+                Institution(name: "I&M Bank Rwanda Plc", type: "BANK", iconSymbol: "building.columns.fill", primaryColorHex: "#0055AA"),
+                Institution(name: "Bank of Kigali Plc", type: "BANK", iconSymbol: "banknote.fill", primaryColorHex: "#0047AB"),
+                Institution(name: "BPR Bank Rwanda Plc", type: "BANK", iconSymbol: "house.fill", primaryColorHex: "#FFA500"),
+                Institution(name: "GT Bank Rwanda Plc", type: "BANK", iconSymbol: "square.grid.2x2.fill", primaryColorHex: "#E34A23"),
+                Institution(name: "Ecobank Rwanda Plc", type: "BANK", iconSymbol: "globe", primaryColorHex: "#006B3D"),
+                Institution(name: "Access Bank Rwanda Plc", type: "BANK", iconSymbol: "arrow.right.circle.fill", primaryColorHex: "#FF6600"),
+                Institution(name: "Equity Bank Rwanda Plc", type: "BANK", iconSymbol: "star.fill", primaryColorHex: "#A52A2A"),
+                Institution(name: "Bank of Africa Rwanda Plc", type: "BANK", iconSymbol: "map.fill", primaryColorHex: "#008000"),
+                Institution(name: "NCBA Rwanda Plc", type: "BANK", iconSymbol: "chart.bar.fill", primaryColorHex: "#C0C0C0")
+            ]
+            try await institutions.create(on: db)
+        }
         
-        // 3. Seed Transactions (More varied and realistic)
-        let transactions = [
-            Transaction(userID: demoUser.id!, type: "RECEIVE", amount: 2500.0, description: "Monthly Salary", counterparty: "Tunga Inc", status: "Completed"),
-            Transaction(userID: demoUser.id!, type: "SEND", amount: -45.50, description: "Lunch with team", counterparty: "KFC Restaurant", status: "Completed"),
-            Transaction(userID: demoUser.id!, type: "TOPUP", amount: 1000.0, description: "Top-up via Bank Account", counterparty: "Chase Bank", status: "Completed"),
-            Transaction(userID: demoUser.id!, type: "SEND", amount: -120.00, description: "Electricity bill", counterparty: "Umeme Ltd", status: "Completed"),
-            Transaction(userID: demoUser.id!, type: "RECEIVE", amount: 350.0, description: "Freelance project payment", counterparty: "Tech Solutions", status: "Completed"),
-            Transaction(userID: demoUser.id!, type: "SEND", amount: -25.00, description: "Netflix subscription", counterparty: "Netflix", status: "Completed"),
-            Transaction(userID: demoUser.id!, type: "TOPUP", amount: 500.0, description: "Top-up via Credit Card", counterparty: "Visa ****1234", status: "Completed"),
-            Transaction(userID: demoUser.id!, type: "SEND", amount: -80.00, description: "Grocery shopping", counterparty: "Carrefour", status: "Completed"),
-            Transaction(userID: demoUser.id!, type: "RECEIVE", amount: 150.0, description: "Refund from store", counterparty: "Amazon", status: "Completed"),
-            Transaction(userID: demoUser.id!, type: "SEND", amount: -200.0, description: "Rent contribution", counterparty: "Jane Smith", status: "Pending"),
-            Transaction(userID: demoUser.id!, type: "SEND", amount: -15.00, description: "Coffee and snacks", counterparty: "Starbucks", status: "Completed"),
-            Transaction(userID: demoUser.id!, type: "TOPUP", amount: 750.0, description: "Top-up via Mobile Money", counterparty: "MTN Mobile Money", status: "Completed"),
-            Transaction(userID: demoUser.id!, type: "SEND", amount: -60.00, description: "Internet bill", counterparty: "Starlink", status: "Completed"),
-            Transaction(userID: demoUser.id!, type: "RECEIVE", amount: 420.0, description: "Birthday gift", counterparty: "Family", status: "Completed"),
-            Transaction(userID: demoUser.id!, type: "SEND", amount: -35.00, description: "Taxi fare", counterparty: "Uber", status: "Completed")
-        ]
-        try await transactions.create(on: db)
+        // 4. Seed Linked Accounts (Persistent Balances for Demo User)
+        let linkedCount = try await LinkedAccount.query(on: db).count()
+        if linkedCount == 0 {
+            // Find specific institutions to link
+            if let mtnInfo = try await Institution.query(on: db).filter(\.$name == "MTN MoMo").first(),
+               let bkInfo = try await Institution.query(on: db).filter(\.$name == "Bank of Kigali Plc").first(),
+               let equityInfo = try await Institution.query(on: db).filter(\.$name == "Equity Bank Rwanda Plc").first() {
+                
+                let linked = [
+                    LinkedAccount(userID: demoUser.id!, institutionID: mtnInfo.id!, accountNumber: "078 812 3456", balance: 54000.0),
+                    LinkedAccount(userID: demoUser.id!, institutionID: bkInfo.id!, accountNumber: "4004 5500 1234", balance: 1250000.0),
+                    LinkedAccount(userID: demoUser.id!, institutionID: equityInfo.id!, accountNumber: "1002 3344 5566", balance: 45000.0)
+                ]
+                try await linked.create(on: db)
+            }
+        }
         
-        print("✅ Database seeded successfully with rich presentation data!")
+        print("✅ Database seeded successfully with Stream (Rwanda) data!")
     }
 }

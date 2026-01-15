@@ -6,8 +6,10 @@ func routes(_ app: Application) throws {
         "SwiftPay Plus Backend is running!"
     }
 
-    try app.register(collection: AuthController())
-    try app.register(collection: WalletController())
-    try app.register(collection: NewsController())
     try app.register(collection: UserController())
+    try app.register(collection: AuthController()) // [NEW]
+    try app.register(collection: TransactionController())
+    try app.register(collection: NewsController())
+    try app.register(collection: InstitutionController()) // [NEW]
+    try app.register(collection: NotificationController()) // [NEW]
 }

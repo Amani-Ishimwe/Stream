@@ -25,12 +25,18 @@ final class Transaction: Model, Content, @unchecked Sendable {
     @Field(key: "status")
     var status: String
 
+    @OptionalField(key: "source_institution_id")
+    var sourceInstitutionID: UUID?
+
+    @OptionalField(key: "destination_institution_id")
+    var destinationInstitutionID: UUID?
+
     @Timestamp(key: "created_at", on: .create)
     var createdAt: Date?
 
     init() { }
 
-    init(id: UUID? = nil, userID: User.IDValue, type: String, amount: Double, description: String? = nil, counterparty: String? = nil, status: String = "Completed") {
+    init(id: UUID? = nil, userID: User.IDValue, type: String, amount: Double, description: String? = nil, counterparty: String? = nil, status: String = "Completed", sourceInstitutionID: UUID? = nil, destinationInstitutionID: UUID? = nil) {
         self.id = id
         self.$user.id = userID
         self.type = type
@@ -38,5 +44,7 @@ final class Transaction: Model, Content, @unchecked Sendable {
         self.description = description
         self.counterparty = counterparty
         self.status = status
+        self.sourceInstitutionID = sourceInstitutionID
+        self.destinationInstitutionID = destinationInstitutionID
     }
 }
