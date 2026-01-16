@@ -15,7 +15,8 @@ struct SeedData {
                 phone: "+250 788 000 000",
                 pin: "123456",
                 passwordHash: passwordHash,
-                balance: 0.0 // Balance is now aggregated from LinkedAccounts
+                balance: 0.0,
+                avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=Amani"
             )
             try await demoUser.save(on: db)
         }
@@ -53,20 +54,42 @@ struct SeedData {
             try await institutions.create(on: db)
         }
         
-        // 4. Seed Linked Accounts (Persistent Balances for Demo User)
+        // 4. Seed Linked Accounts (Link ALL institutions to Demo User)
         let linkedCount = try await LinkedAccount.query(on: db).count()
         if linkedCount == 0 {
-            // Find specific institutions to link
-            if let mtnInfo = try await Institution.query(on: db).filter(\.$name == "MTN MoMo").first(),
-               let bkInfo = try await Institution.query(on: db).filter(\.$name == "Bank of Kigali Plc").first(),
-               let equityInfo = try await Institution.query(on: db).filter(\.$name == "Equity Bank Rwanda Plc").first() {
+            let institutions = try await Institution.query(on: db).all()
+            for (index, inst) in institutions.enumerated() {
+                // Generate a semi-random balanced for realism
+                let balances: [Double] = [1250000, 54000, 45000, 890000, 15000, 320000, 12000, 450000, 25000, 78000, 210000]
+                let balance = (index < balances.count) ? balances[index] : Double.random(in: 10000...500000)
                 
-                let linked = [
-                    LinkedAccount(userID: demoUser.id!, institutionID: mtnInfo.id!, accountNumber: "078 812 3456", balance: 54000.0),
-                    LinkedAccount(userID: demoUser.id!, institutionID: bkInfo.id!, accountNumber: "4004 5500 1234", balance: 1250000.0),
-                    LinkedAccount(userID: demoUser.id!, institutionID: equityInfo.id!, accountNumber: "1002 3344 5566", balance: 45000.0)
+                let accountNumber = "STREAM-\(Int.random(in: 1000...9999))-\(Int.random(in: 1000...9999))"
+                let linked = LinkedAccount(
+                    userID: demoUser.id!,
+                    institutionID: inst.id!,
+                    accountNumber: accountNumber,
+                    balance: balance,
+                    dailyLimit: 2000000,
+                    monthlyLimit: 10000000
+                )
+                try await linked.save(on: db)
+            }
+        }
+        
+        // 5. Seed Initial Transactions
+        let txCount = try await Transaction.query(on: db).count()
+        if txCount < 5 {
+            if let mtnLine = try await LinkedAccount.query(on: db).with(\.$institution).first(),
+               let bkLine = try await LinkedAccount.query(on: db).filter(\.$accountNumber == "4004 5500 1234").first() {
+                 let txs = [
+                    Transaction(type: "RECEIVE", amount: 250000, description: "Monthly Salary", counterparty: "Tunga Inc", status: "Completed", userID: demoUser.id!, destinationInstitutionID: bkLine.$institution.id),
+                    Transaction(type: "SEND", amount: -5000, description: "Internet Bundle", counterparty: "MTN Rwanda", status: "Completed", userID: demoUser.id!, sourceInstitutionID: mtnLine.$institution.id),
+                    Transaction(type: "SEND", amount: -12500, description: "Groceries", counterparty: "Simba Supermarket", status: "Completed", userID: demoUser.id!, sourceInstitutionID: bkLine.$institution.id),
+                    Transaction(type: "TOPUP", amount: 40000, description: "Wallet Top up", counterparty: "Self", status: "Completed", userID: demoUser.id!, sourceInstitutionID: mtnLine.$institution.id),
+                    Transaction(type: "SEND", amount: -2100, description: "Coffee", counterparty: "Question Coffee", status: "Completed", userID: demoUser.id!, sourceInstitutionID: mtnLine.$institution.id),
+                    Transaction(type: "RECEIVE", amount: 15000, description: "Refund", counterparty: "Jumia Rwanda", status: "Completed", userID: demoUser.id!, destinationInstitutionID: mtnLine.$institution.id)
                 ]
-                try await linked.create(on: db)
+                try await txs.create(on: db)
             }
         }
         

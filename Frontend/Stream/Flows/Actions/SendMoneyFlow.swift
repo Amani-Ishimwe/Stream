@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SendMoneyFlow: View {
+    var preSelectedSource: Institution? = nil
     @StateObject private var viewModel = TransactionViewModel()
     @State private var step: Int = 1
     @Environment(\.presentationMode) var presentationMode
@@ -20,7 +21,7 @@ struct SendMoneyFlow: View {
                     Group {
                         switch step {
                         case 1:
-                            RecipientStep(recipient: $viewModel.recipient, onNext: { withAnimation { step = 2 } })
+                            RecipientStep(viewModel: viewModel, onNext: { withAnimation { step = preSelectedSource != nil ? 3 : 2 } })
                         case 2:
                             SourceSelectionStep(selectedSource: $viewModel.selectedSource, onNext: { withAnimation { step = 3 } })
                         case 3:
@@ -35,6 +36,11 @@ struct SendMoneyFlow: View {
                                           removal: .move(edge: .leading).combined(with: .opacity)))
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .onAppear {
+            if let source = preSelectedSource {
+                viewModel.selectedSource = source
             }
         }
     }
@@ -84,26 +90,86 @@ struct ProgressStepBar: View {
 
 // MARK: - Flow Steps
 
+@MainActor
 struct RecipientStep: View {
-    @Binding var recipient: String
+    @ObservedObject var viewModel: TransactionViewModel
+    @State private var transferType: TransferType = .phone
     var onNext: () -> Void
     @Environment(\.colorScheme) var scheme
+    
+    enum TransferType: String, CaseIterable {
+        case phone = "PHONE"
+        case bank = "BANK"
+    }
     
     var body: some View {
         VStack(spacing: DesignSystem.Spacing.xl) {
             VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
-                Text("SPECIFY RECIPIENT")
+                Text("TRANSFER TYPE")
                     .font(DesignSystem.Typography.caption)
                     .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
                 
-                TextField("IDENTIFIER (PHONE/EMAIL)", text: $recipient)
+                HStack(spacing: 0) {
+                    ForEach(TransferType.allCases, id: \.self) { type in
+                        Button(action: { 
+                            withAnimation { 
+                                transferType = type 
+                                viewModel.recipient = ""
+                                viewModel.metadata["type"] = type.rawValue
+                            }
+                        }) {
+                            Text(type.rawValue)
+                                .font(DesignSystem.Typography.caption).bold()
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(transferType == type ? DesignSystem.Colors.textPrimary(scheme) : Color.clear)
+                                .foregroundColor(transferType == type ? DesignSystem.Colors.background(scheme) : DesignSystem.Colors.textPrimary(scheme))
+                        }
+                    }
+                }
+                .background(DesignSystem.Colors.surface(scheme))
+                .cornerRadius(12)
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(DesignSystem.Colors.textPrimary(scheme), lineWidth: 1))
+                
+                Text(transferType == .phone ? "MOBILE MONEY NUMBER" : "BANK ACCOUNT NUMBER")
+                    .font(DesignSystem.Typography.caption)
+                    .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
+                    .padding(.top, 8)
+                
+                TextField(transferType == .phone ? "078 000 0000" : "ACCOUNT NUMBER", text: $viewModel.recipient)
                     .font(DesignSystem.Typography.title2)
+                    .keyboardType(transferType == .phone ? .phonePad : .numberPad)
                     .padding()
                     .background(DesignSystem.Colors.surface(scheme))
-                    .cornerRadius(DesignSystem.Spacing.cornerRadiusButton)
-                    .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
+                    .clipShape(Capsule()) // More rounded circular input
+                    .overlay(Capsule().stroke(DesignSystem.Colors.textPrimary(scheme).opacity(0.1), lineWidth: 1))
                 
-                Text("Funds will be available immediately after confirmation.")
+                if transferType == .bank {
+                    Text("SELECT BANK")
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
+                        .padding(.top, 8)
+                    
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(["BK", "I&M", "BPR", "EQUITY", "GTBANK"], id: \.self) { bank in
+                                Button(action: { 
+                                    viewModel.metadata["bank"] = bank 
+                                }) {
+                                    Text(bank)
+                                        .font(DesignSystem.Typography.caption).bold()
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 10)
+                                        .background(viewModel.metadata["bank"] == bank ? DesignSystem.Colors.textPrimary(scheme) : DesignSystem.Colors.surface(scheme))
+                                        .foregroundColor(viewModel.metadata["bank"] == bank ? DesignSystem.Colors.background(scheme) : DesignSystem.Colors.textPrimary(scheme))
+                                        .cornerRadius(20)
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                Text(transferType == .phone ? "Enter the recipient's phone number as registered on MTN or Airtel." : "Enter the specific bank account number of the recipient.")
                     .font(DesignSystem.Typography.footnote)
                     .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
             }
@@ -112,10 +178,16 @@ struct RecipientStep: View {
             Spacer()
             
             Button("PROCEED", action: onNext)
-                .buttonStyle(PrimaryButtonStyle(isEnabled: !recipient.isEmpty))
+                .buttonStyle(PrimaryButtonStyle(isEnabled: isFormValid))
                 .padding()
-                .disabled(recipient.isEmpty)
+                .disabled(!isFormValid)
         }
+    }
+    
+    private var isFormValid: Bool {
+        if viewModel.recipient.count < (transferType == .phone ? 10 : 8) { return false }
+        if transferType == .bank && viewModel.metadata["bank"] == nil { return false }
+        return true
     }
 }
 

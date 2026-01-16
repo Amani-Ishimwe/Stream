@@ -86,11 +86,14 @@ struct ActivityView: View {
                     .padding(.vertical, 8)
                 ) {
                     ForEach(viewModel.groupedTransactions[date] ?? []) { tx in
-                        ActivityLedgerRow(tx: tx)
-                            .listRowInsets(EdgeInsets(top: 0, leading: DesignSystem.Spacing.lg, bottom: 0, trailing: DesignSystem.Spacing.lg))
-                            .listRowSeparator(.visible, edges: .bottom)
-                            .listRowSeparatorTint(DesignSystem.Colors.textPrimary(scheme).opacity(0.1))
-                            .listRowBackground(Color.clear)
+                        NavigationLink(destination: TransactionDetailView(transaction: tx)) {
+                            ActivityLedgerRow(tx: tx)
+                        }
+                        .listRowInsets(EdgeInsets(top: 0, leading: DesignSystem.Spacing.lg, bottom: 0, trailing: DesignSystem.Spacing.lg))
+                        .listRowSeparator(.visible, edges: .bottom)
+                        .listRowSeparatorTint(DesignSystem.Colors.textPrimary(scheme).opacity(0.1))
+                        .listRowBackground(Color.clear)
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -207,7 +210,7 @@ struct ActivityLedgerRow: View {
                 .opacity(0.8)
             
             VStack(alignment: .leading, spacing: 2) {
-                Text(tx.counterparty.uppercased())
+                Text((tx.counterparty ?? "UNKNOWN").uppercased())
                     .font(DesignSystem.Typography.footnote)
                     .bold()
                     .foregroundColor(DesignSystem.Colors.textPrimary(scheme))

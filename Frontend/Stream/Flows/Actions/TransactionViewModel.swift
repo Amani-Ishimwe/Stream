@@ -9,6 +9,7 @@ class TransactionViewModel: ObservableObject {
     @Published var selectedSource: Institution?
     @Published var selectedDestination: Institution?
     @Published var payer = ""
+    @Published var metadata: [String: String] = [:]
     
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -23,7 +24,7 @@ class TransactionViewModel: ObservableObject {
         errorMessage = nil
         
         do {
-            let response = try await api.sendMoney(sourceId: source.id, recipient: recipient, amount: amount)
+            let response = try await api.sendMoney(sourceId: source.id, recipient: recipient, amount: amount, metadata: metadata)
             if response.success {
                 self.successMessage = response.message
                 self.transactionId = response.transactionId
@@ -52,6 +53,28 @@ class TransactionViewModel: ObservableObject {
                 return true
             } else {
                 errorMessage = response.message ?? "Top-up failed"
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        
+        isLoading = false
+        return false
+    }
+    
+    func requestMoney() async -> Bool {
+        guard let dest = selectedDestination else { return false }
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            let response = try await api.requestMoney(destinationId: dest.id, amount: amount, payer: payer)
+            if response.success {
+                self.successMessage = response.message
+                self.transactionId = response.transactionId
+                return true
+            } else {
+                errorMessage = response.message ?? "Request failed"
             }
         } catch {
             errorMessage = error.localizedDescription

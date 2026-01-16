@@ -8,6 +8,7 @@ struct StreamApp: App {
         WindowGroup {
             StreamRootView()
                 .environmentObject(appState)
+                .preferredColorScheme(appState.colorSchemeOverride)
         }
     }
 }

@@ -9,6 +9,7 @@ struct DashboardView: View {
     @State private var showSendFlow = false
     @State private var showRequestFlow = false
     @State private var showTopUpFlow = false
+    @State private var showScanner = false
     
     var body: some View {
         ZStack {
@@ -37,6 +38,7 @@ struct DashboardView: View {
         .sheet(isPresented: $showSendFlow) { SendMoneyFlow() }
         .sheet(isPresented: $showRequestFlow) { RequestMoneyFlow() }
         .sheet(isPresented: $showTopUpFlow) { TopUpFlow() }
+        .fullScreenCover(isPresented: $showScanner) { QRScannerView() }
     }
     
     // MARK: - Components
@@ -147,7 +149,7 @@ struct DashboardView: View {
         HStack(spacing: DesignSystem.Spacing.md) {
             QuickActionBtn(title: "SEND", icon: "arrow.up.right", action: { showSendFlow = true })
             QuickActionBtn(title: "REQUEST", icon: "arrow.down.left", action: { showRequestFlow = true })
-            QuickActionBtn(title: "SCAN", icon: "qrcode.viewfinder", action: { /* Scan Action */ })
+            QuickActionBtn(title: "SCAN", icon: "qrcode.viewfinder", action: { showScanner = true })
             QuickActionBtn(title: "TOP UP", icon: "plus.circle", action: { showTopUpFlow = true })
         }
         .padding(.horizontal, DesignSystem.Spacing.lg)
@@ -164,8 +166,11 @@ struct DashboardView: View {
                 if viewModel.isLoading {
                     ProgressView().tint(DesignSystem.Colors.textPrimary(scheme))
                 } else {
-                    ForEach(viewModel.institutions) { inst in
-                        InstitutionRow(institution: inst)
+                    ForEach(viewModel.institutions.prefix(4)) { inst in
+                        NavigationLink(destination: InstitutionDetailView(institution: inst)) {
+                            InstitutionRow(institution: inst)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -188,7 +193,10 @@ struct DashboardView: View {
             
             VStack(spacing: 1) {
                 ForEach(viewModel.recentTransactions) { tx in
-                    ActivityRow(tx: tx)
+                    NavigationLink(destination: TransactionDetailView(transaction: tx)) {
+                        ActivityRow(tx: tx)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .background(DesignSystem.Colors.surface(scheme))
@@ -211,6 +219,10 @@ struct QuickActionBtn: View {
             VStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.system(size: 18, weight: .bold))
+                    .frame(width: 44, height: 44)
+                    .background(DesignSystem.Colors.background(scheme))
+                    .clipShape(Circle())
+                
                 Text(title)
                     .font(DesignSystem.Typography.caption)
                     .bold()
@@ -241,8 +253,9 @@ struct InstitutionRow: View {
                 Text(institution.name.uppercased())
                     .font(DesignSystem.Typography.footnote)
                     .bold()
-                Text(institution.type)
+                Text(institution.accountNumber ?? institution.type)
                     .font(DesignSystem.Typography.caption)
+                    .monospacedDigit()
                     .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
             }
             
@@ -270,7 +283,7 @@ struct ActivityRow: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text(tx.counterparty.uppercased())
+                Text((tx.counterparty ?? "UNKNOWN").uppercased())
                     .font(DesignSystem.Typography.footnote)
                     .bold()
                 Text(tx.createdAt, style: .time)

@@ -59,7 +59,8 @@ struct AuthController: RouteCollection, Sendable {
         let payload = UserPayload(
             sub: .init(value: user.id!.uuidString),
             name: user.name,
-            email: user.email
+            email: user.email,
+            tokenVersion: user.tokenVersion
         )
         
         let token = try req.jwt.sign(payload)

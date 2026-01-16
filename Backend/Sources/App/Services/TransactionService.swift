@@ -1,17 +1,26 @@
 import Vapor
 import Fluent
 
-struct TransactionResult {
+struct TransactionResult: Sendable {
     let transaction: Transaction
     let updatedBalances: [BalanceUpdate]
 }
 
-struct TransactionService {
-    
+final class TransactionService: Sendable {
+    // Helper to calculate spend within a time range
+    private func getSpentAmount(userID: UUID, sourceID: UUID, since: Date, on db: Database) async throws -> Double {
+        let txs = try await Transaction.query(on: db)
+            .filter(\.$user.$id == userID)
+            .filter(\.$sourceInstitutionID == sourceID)
+            .filter(\.$createdAt >= since)
+            .filter(\.$status == "Completed")
+            .all()
+        return txs.reduce(0) { $0 + abs($1.amount) }
+    }
+
     // Top-Up: Source (Linked) -> Dest (Linked)
     func performTopUp(user: User, sourceID: UUID, destinationID: UUID, amount: Double, on db: Database) async throws -> TransactionResult {
-        guard amount > 0 else { throw Abort(.badRequest, reason: "Amount must be positive") }
-        
+        guard amount >= 10 else { throw Abort(.badRequest, reason: "Minimum transaction amount is 10 RWF") }
         let userID = try user.requireID()
         
         guard let sourceAccount = try await LinkedAccount.query(on: db)
@@ -21,36 +30,42 @@ struct TransactionService {
             throw Abort(.notFound, reason: "Source account not linked.")
         }
         
+        guard !sourceAccount.isFrozen else {
+            throw Abort(.forbidden, reason: "Source account is frozen. Please contact support.")
+        }
+        
         guard let destAccount = try await LinkedAccount.query(on: db)
             .filter(\.$user.$id == userID)
             .filter(\.$institution.$id == destinationID)
             .first() else {
             throw Abort(.notFound, reason: "Destination account not linked.")
         }
-        
-        // 2. Validate Balance
+
+        // Limit Checks
+        let today = Calendar.current.startOfDay(for: Date())
+        let dailySpent = try await getSpentAmount(userID: userID, sourceID: sourceID, since: today, on: db)
+        if dailySpent + amount > sourceAccount.dailyLimit {
+            throw Abort(.forbidden, reason: "Daily limit exceeded. Remaining: \(Int(sourceAccount.dailyLimit - dailySpent)) RWF")
+        }
+
         guard sourceAccount.balance >= amount else {
-            throw Abort(.badRequest, reason: "Insufficient balance in source account.")
+            throw Abort(.badRequest, reason: "Insufficient balance.")
         }
         
-        // 3. Perform Atomically
         return try await db.transaction { transactionDB in
-            // Deduct
             sourceAccount.balance -= amount
             try await sourceAccount.save(on: transactionDB)
             
-            // Credit
             destAccount.balance += amount
             try await destAccount.save(on: transactionDB)
             
-            // Record
             let transaction = Transaction(
-                userID: userID,
                 type: "TOPUP",
                 amount: amount,
-                description: "Top-Up between accounts",
+                description: "Internal Infusion",
                 counterparty: "Self",
                 status: "Completed",
+                userID: userID,
                 sourceInstitutionID: sourceID,
                 destinationInstitutionID: destinationID
             )
@@ -67,38 +82,46 @@ struct TransactionService {
     }
     
     // Send Money: Source (Linked) -> External
-    func performSend(user: User, sourceID: UUID, amount: Double, recipient: String, on db: Database) async throws -> TransactionResult {
-        guard amount > 0 else { throw Abort(.badRequest, reason: "Amount must be positive") }
-        
+    func performSend(user: User, sourceID: UUID, amount: Double, recipient: String, metadata: [String: String]? = nil, on db: Database) async throws -> TransactionResult {
+        guard amount >= 10 else { throw Abort(.badRequest, reason: "Minimum transaction amount is 10 RWF") }
         let userID = try user.requireID()
         
-        // 1. Fetch Source Account
         guard let sourceAccount = try await LinkedAccount.query(on: db)
             .filter(\.$user.$id == userID)
             .filter(\.$institution.$id == sourceID)
             .first() else {
             throw Abort(.notFound, reason: "Source account not found.")
         }
-        
-        // 2. Validate Balance
-        guard sourceAccount.balance >= amount else {
-            throw Abort(.badRequest, reason: "Insufficient balance.")
+
+        guard !sourceAccount.isFrozen else {
+            throw Abort(.forbidden, reason: "Account is frozen.")
+        }
+
+        // Daily Limit Check
+        let today = Calendar.current.startOfDay(for: Date())
+        let dailySpent = try await getSpentAmount(userID: userID, sourceID: sourceID, since: today, on: db)
+        if dailySpent + amount > sourceAccount.dailyLimit {
+            throw Abort(.forbidden, reason: "Daily limit of \(Int(sourceAccount.dailyLimit)) RWF exceeded.")
         }
         
-        // 3. Execute
+        guard sourceAccount.balance >= amount else {
+            throw Abort(.badRequest, reason: "Insufficient funds.")
+        }
+        
         return try await db.transaction { transactionDB in
             sourceAccount.balance -= amount
             try await sourceAccount.save(on: transactionDB)
             
             let transaction = Transaction(
-                userID: userID,
                 type: "SEND",
                 amount: -amount,
                 description: "Transfer to \(recipient)",
                 counterparty: recipient,
                 status: "Completed",
+                userID: userID,
                 sourceInstitutionID: sourceID,
-                destinationInstitutionID: nil
+                destinationInstitutionID: nil,
+                metadata: metadata
             )
             try await transaction.save(on: transactionDB)
             
@@ -113,8 +136,7 @@ struct TransactionService {
     
     // Request Money: External -> Dest (Linked)
     func performRequest(user: User, destinationID: UUID, amount: Double, payer: String, on db: Database) async throws -> TransactionResult {
-        guard amount > 0 else { throw Abort(.badRequest, reason: "Amount must be positive") }
-        
+        guard amount >= 10 else { throw Abort(.badRequest, reason: "Minimum request amount is 10 RWF") }
         let userID = try user.requireID()
         
         guard let destAccount = try await LinkedAccount.query(on: db)
@@ -129,12 +151,12 @@ struct TransactionService {
             try await destAccount.save(on: transactionDB)
             
             let transaction = Transaction(
-                userID: userID,
                 type: "RECEIVE",
                 amount: amount,
-                description: "Payment from \(payer)",
+                description: "Asset Request from \(payer)",
                 counterparty: payer,
                 status: "Completed",
+                userID: userID,
                 sourceInstitutionID: nil,
                 destinationInstitutionID: destinationID
             )

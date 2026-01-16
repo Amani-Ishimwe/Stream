@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct TopUpFlow: View {
+    var preSelectedSource: Institution? = nil
     @StateObject private var viewModel = TransactionViewModel()
     @State private var step: Int = 1
     @Environment(\.presentationMode) var presentationMode
@@ -32,6 +33,13 @@ struct TopUpFlow: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .onAppear {
+            if let source = preSelectedSource {
+                viewModel.selectedSource = source
+                // We'll skip to step 2 if source is pre-selected
+                step = 2
             }
         }
     }

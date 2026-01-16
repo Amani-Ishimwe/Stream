@@ -5,7 +5,7 @@ struct TransactionController: RouteCollection {
     let transactionService = TransactionService()
     
     func boot(routes: RoutesBuilder) throws {
-        let transactions = routes.grouped("transactions")
+        let transactions = routes.grouped("transactions").grouped(SessionValidationMiddleware())
         transactions.get(use: index)
         transactions.post("send", use: sendMoney)
         transactions.post("topup", use: topUp)
@@ -27,20 +27,21 @@ struct TransactionController: RouteCollection {
         let sourceInstitutionID: UUID
         let amount: Double
         let recipient: String
+        let metadata: [String: String]?
     }
-    
+
     struct TopUpRequest: Content {
         let sourceInstitutionID: UUID
         let destinationInstitutionID: UUID
         let amount: Double
     }
-    
+
     struct RequestMoneyRequest: Content {
         let destinationInstitutionID: UUID
         let amount: Double
         let payer: String
     }
-
+    
     // POST /transactions/send
     func sendMoney(req: Request) async throws -> StreamResponse<Transaction> {
         let user = try req.auth.require(User.self)
@@ -50,6 +51,7 @@ struct TransactionController: RouteCollection {
             sourceID: input.sourceInstitutionID,
             amount: input.amount,
             recipient: input.recipient,
+            metadata: input.metadata,
             on: req.db
         )
         return StreamResponse(

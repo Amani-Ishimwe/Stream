@@ -6,6 +6,15 @@ class AppState: ObservableObject {
     @Published var currentUser: UserProfile?
     @Published var isAuthenticated: Bool = false
     @Published var hasCompletedOnboarding: Bool = false
+    @Published var colorSchemeOverride: ColorScheme? = nil {
+        didSet {
+            if let scheme = colorSchemeOverride {
+                UserDefaults.standard.set(scheme == .dark ? "dark" : "light", forKey: "stream_theme")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "stream_theme")
+            }
+        }
+    }
     
     // Auth Session
     var token: String? {
@@ -13,6 +22,9 @@ class AppState: ObservableObject {
     }
     
     init() {
+        if let savedTheme = UserDefaults.standard.string(forKey: "stream_theme") {
+            self._colorSchemeOverride = Published(initialValue: savedTheme == "dark" ? .dark : .light)
+        }
         checkAuth()
     }
     

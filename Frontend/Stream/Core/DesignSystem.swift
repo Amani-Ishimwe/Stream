@@ -14,8 +14,12 @@ struct DesignSystem {
         }
         
         static func surface(_ scheme: ColorScheme) -> Color {
-            // High clarity surface: slightly opaque variant of the opposite color or a subtly shifted variant
-            scheme == .dark ? deepBlue.opacity(0.8) : softBeige.opacity(0.9)
+            // High clarity surface
+            scheme == .dark ? Color.white.opacity(0.05) : Color.black.opacity(0.03)
+        }
+        
+        static func shadow(_ scheme: ColorScheme) -> Color {
+            scheme == .dark ? Color.black.opacity(0.5) : deepBlue.opacity(0.1)
         }
         
         static func textPrimary(_ scheme: ColorScheme) -> Color {

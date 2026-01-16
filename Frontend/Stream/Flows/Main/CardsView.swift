@@ -8,6 +8,7 @@ struct CardsView: View {
     
     @State private var isFlipped = false
     @State private var degrees: Double = 0
+    @State private var showingScanner = false
     
     var body: some View {
         ZStack {
@@ -18,31 +19,42 @@ struct CardsView: View {
                 
                 // Smart Card Container
                 VStack(spacing: DesignSystem.Spacing.lg) {
-                    smartCard
-                        .rotation3DEffect(.degrees(degrees), axis: (x: 0, y: 1, z: 0))
-                        .onTapGesture {
-                            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                                isFlipped.toggle()
-                                degrees += 180
-                            }
+                    ZStack {
+                        cardFront
+                            .opacity(isFlipped ? 0 : 1)
+                            .rotation3DEffect(.degrees(degrees), axis: (x: 0, y: 1, z: 0))
+                        
+                        cardBack
+                            .opacity(isFlipped ? 1 : 0)
+                            .rotation3DEffect(.degrees(degrees + 180), axis: (x: 0, y: 1, z: 0))
+                    }
+                    .frame(height: 220)
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                            isFlipped.toggle()
+                            degrees += 180
                         }
+                    }
                     
                     Text(isFlipped ? "TAP TO VIEW DETAILS" : "TAP TO REVEAL PAYMENT QR")
                         .font(DesignSystem.Typography.caption)
                         .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
                 }
                 .padding(.top, DesignSystem.Spacing.xl)
+                .padding(.horizontal, DesignSystem.Spacing.lg)
                 
                 // Card Actions
                 VStack(spacing: DesignSystem.Spacing.md) {
                     HStack(spacing: DesignSystem.Spacing.md) {
-                        CardActionBtn(title: "FREEZE", icon: "snow", isActive: true) {
+                        CardActionBtn(title: viewModel.institutions.first?.isFrozen == true ? "UNFREEZE" : "FREEZE", 
+                                     icon: viewModel.institutions.first?.isFrozen == true ? "sun.max.fill" : "snow", 
+                                     isActive: true) {
                             if let first = viewModel.institutions.first {
                                 Task { await toggleFreeze(id: first.id) }
                             }
                         }
                         CardActionBtn(title: "SCAN", icon: "qrcode.viewfinder", isActive: true) {
-                            // QR Scan
+                            showingScanner = true
                         }
                     }
                     
@@ -55,6 +67,9 @@ struct CardsView: View {
                 
                 Spacer()
             }
+        }
+        .fullScreenCover(isPresented: $showingScanner) {
+            QRScannerView()
         }
         .onAppear {
             Task { await viewModel.refreshData() }
@@ -76,19 +91,6 @@ struct CardsView: View {
         .padding(.top, DesignSystem.Spacing.md)
     }
     
-    private var smartCard: some View {
-        ZStack {
-            if isFlipped {
-                cardBack.rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
-            } else {
-                cardFront
-            }
-        }
-        .frame(height: 220)
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, DesignSystem.Spacing.lg)
-    }
-    
     private var cardFront: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
@@ -102,8 +104,8 @@ struct CardsView: View {
             
             Spacer()
             
-            Text(appState.currentUser?.id.uuidString.prefix(18).uppercased() ?? "STRM-9283-KLA-112")
-                .font(.system(size: 20, weight: .bold, design: .monospaced))
+            Text("•••• •••• •••• 9283")
+                .font(.system(size: 24, weight: .bold, design: .monospaced))
             
             Spacer()
             
@@ -122,9 +124,10 @@ struct CardsView: View {
                     Text(viewModel.institutions.first?.isFrozen == true ? "FROZEN" : "ACTIVE")
                         .font(DesignSystem.Typography.caption)
                         .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
+                        .padding(.vertical, 4)
                         .background(DesignSystem.Colors.background(scheme))
-                        .cornerRadius(4)
+                        .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
+                        .cornerRadius(6)
                 }
             }
         }
@@ -145,11 +148,9 @@ struct CardsView: View {
             if let id = appState.currentUser?.id {
                 QRCodeView(data: "stream://user/\(id.uuidString)")
                     .frame(width: 140, height: 140)
+                    .padding(12)
                     .background(Color.white)
                     .cornerRadius(12)
-                    .padding(8)
-                    .background(DesignSystem.Colors.textPrimary(scheme))
-                    .cornerRadius(16)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

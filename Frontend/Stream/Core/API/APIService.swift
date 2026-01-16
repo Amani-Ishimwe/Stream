@@ -37,7 +37,7 @@ struct BalanceUpdate: Decodable {
 class APIService: ObservableObject {
     static let shared = APIService()
     
-    private let baseURL = "http://127.0.0.1:8080"
+    private let baseURL = "http://10.12.73.61:8080"
     
     // Auth Session (managed by AppState, but APIService needs it for headers)
     private var token: String? {
@@ -111,10 +111,28 @@ class APIService: ObservableObject {
         return try await request("/user/profile", authToken: token)
     }
     
+    func updateProfile(name: String, phone: String, avatarUrl: String?) async throws -> StreamResponse<EmptyResponse> {
+        let body = UpdateProfileDTO(name: name, phone: phone, avatarUrl: avatarUrl)
+        return try await request("/user/profile", method: "PUT", body: body)
+    }
+    
+    func changePin(oldPin: String, newPin: String) async throws -> StreamResponse<EmptyResponse> {
+        let body = ChangePinDTO(oldPin: oldPin, newPin: newPin)
+        return try await request("/user/pin", method: "POST", body: body)
+    }
+    
+    func terminateSessions() async throws -> StreamResponse<EmptyResponse> {
+        return try await request("/user/terminate-sessions", method: "POST")
+    }
+    
     // MARK: - Institutions
     
     func fetchInstitutions() async throws -> StreamResponse<[Institution]> {
         return try await request("/institutions")
+    }
+    
+    func fetchInstitutionTransactions(id: UUID) async throws -> StreamResponse<[Transaction]> {
+        return try await request("/institutions/\(id.uuidString)/transactions")
     }
     
     func toggleFreeze(id: UUID) async throws -> StreamResponse<Institution> {
@@ -127,8 +145,8 @@ class APIService: ObservableObject {
         return try await request("/transactions")
     }
     
-    func sendMoney(sourceId: UUID, recipient: String, amount: Double) async throws -> StreamResponse<Transaction> {
-        let body = SendMoneyDTO(sourceInstitutionID: sourceId, amount: amount, recipient: recipient)
+    func sendMoney(sourceId: UUID, recipient: String, amount: Double, metadata: [String: String]? = nil) async throws -> StreamResponse<Transaction> {
+        let body = SendMoneyDTO(sourceInstitutionID: sourceId, amount: amount, recipient: recipient, metadata: metadata)
         return try await request("/transactions/send", method: "POST", body: body)
     }
     
@@ -136,7 +154,11 @@ class APIService: ObservableObject {
         let body = TopUpDTO(sourceInstitutionID: sourceId, destinationInstitutionID: destinationId, amount: amount)
         return try await request("/transactions/topup", method: "POST", body: body)
     }
+    
+    func requestMoney(destinationId: UUID, amount: Double, payer: String) async throws -> StreamResponse<Transaction> {
+        let body = RequestMoneyDTO(destinationInstitutionID: destinationId, amount: amount, payer: payer)
+        return try await request("/transactions/request", method: "POST", body: body)
+    }
 }
 
-// MARK: - Empty Response Helper
 struct EmptyResponse: Decodable {}

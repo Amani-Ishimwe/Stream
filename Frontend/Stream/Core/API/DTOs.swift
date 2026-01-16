@@ -27,6 +27,7 @@ struct SendMoneyDTO: Encodable {
     let sourceInstitutionID: UUID
     let amount: Double
     let recipient: String
+    let metadata: [String: String]?
 }
 
 struct TopUpDTO: Encodable {
@@ -39,4 +40,16 @@ struct RequestMoneyDTO: Encodable {
     let destinationInstitutionID: UUID
     let amount: Double
     let payer: String
+}
+
+// MARK: - User DTOs
+struct UpdateProfileDTO: Encodable {
+    let name: String
+    let phone: String
+    let avatarUrl: String?
+}
+
+struct ChangePinDTO: Encodable {
+    let oldPin: String
+    let newPin: String
 }

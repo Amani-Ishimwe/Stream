@@ -1,4 +1,5 @@
 import SwiftUI
+import LocalAuthentication
 
 struct SettingsView: View {
     @EnvironmentObject var appState: AppState
@@ -26,8 +27,14 @@ struct SettingsView: View {
                             VStack(spacing: 1) {
                                 SettingToggleRow(icon: "faceid", title: "BIOMETRIC AUTH", isOn: $isFaceIDEnabled)
                                 SettingToggleRow(icon: "bell.badge", title: "PUSH NOTIFICATIONS", isOn: $isPushEnabled)
-                                SettingActionRow(icon: "paintbrush", title: "APPEARANCE") {
-                                    // Theme toggle logic (automatic via system but could be manual)
+                                SettingActionRow(icon: "circle.lefthalf.filled", title: "TOGGLE DARK MODE") {
+                                    withAnimation {
+                                        if appState.colorSchemeOverride == .dark {
+                                            appState.colorSchemeOverride = .light
+                                        } else {
+                                            appState.colorSchemeOverride = .dark
+                                        }
+                                    }
                                 }
                             }
                             .background(DesignSystem.Colors.surface(scheme))
@@ -42,9 +49,16 @@ struct SettingsView: View {
                                 .padding(.horizontal, DesignSystem.Spacing.lg)
                             
                             VStack(spacing: 1) {
-                                SettingActionRow(icon: "lock.shield", title: "CHANGE PIN") { }
-                                SettingActionRow(icon: "doc.text", title: "TERMS OF SERVICE") { }
-                                SettingActionRow(icon: "questionmark.circle", title: "HELP & SUPPORT") { }
+                                NavigationLink(destination: ProfileEditView()) {
+                                    SettingRowContent(icon: "person.text.rectangle", title: "EDIT PROFILE")
+                                }
+                                NavigationLink(destination: PINChangeView()) {
+                                    SettingRowContent(icon: "lock.shield", title: "CHANGE SECURITY PIN")
+                                }
+                                
+                                Button(action: terminateSessions) {
+                                    SettingRowContent(icon: "arrow.right.circle", title: "TERMINATE ALL SESSIONS")
+                                }
                             }
                             .background(DesignSystem.Colors.surface(scheme))
                             .cornerRadius(DesignSystem.Spacing.cornerRadiusCard)
@@ -52,21 +66,43 @@ struct SettingsView: View {
                         }
                         
                         Button(action: { appState.logout() }) {
-                            HStack {
-                                Image(systemName: "arrow.right.square")
-                                Text("TERMINATE SESSION")
-                                    .bold()
-                            }
-                            .font(DesignSystem.Typography.callout)
-                            .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
-                            .padding()
-                            .frame(maxWidth: .infinity)
-                            .background(DesignSystem.Colors.surface(scheme))
-                            .cornerRadius(DesignSystem.Spacing.cornerRadiusButton)
+                            Text("LOGOUT")
+                                .font(DesignSystem.Typography.caption)
+                                .bold()
+                                .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(DesignSystem.Colors.surface(scheme))
+                                .cornerRadius(DesignSystem.Spacing.cornerRadiusButton)
                         }
                         .padding(.horizontal, DesignSystem.Spacing.lg)
                     }
                     .padding(.vertical, DesignSystem.Spacing.lg)
+                }
+            }
+        }
+    }
+    
+    func terminateSessions() {
+        Task {
+            do {
+                let response = try await APIService.shared.terminateSessions()
+                if response.success {
+                    appState.logout()
+                }
+            } catch {
+                print("Failed: \(error)")
+            }
+        }
+    }
+    
+    func authenticateBiometrics() {
+        let context = LAContext()
+        var error: NSError?
+        if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
+            context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: "ENABLING SECURE ACCESS") { success, _ in
+                DispatchQueue.main.async {
+                    self.isFaceIDEnabled = success
                 }
             }
         }
@@ -86,9 +122,19 @@ struct SettingsView: View {
     
     private var profileSection: some View {
         HStack(spacing: 20) {
-            Image(systemName: "person.crop.circle.fill")
-                .font(.system(size: 60))
-                .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
+            AsyncImage(url: URL(string: appState.currentUser?.avatarUrl ?? "")) { phase in
+                switch phase {
+                case .success(let image):
+                    image.resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 60, height: 60)
+                        .clipShape(Circle())
+                default:
+                    Image(systemName: "person.crop.circle.fill")
+                        .font(.system(size: 60))
+                        .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
+                }
+            }
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(appState.currentUser?.name.uppercased() ?? "USER NAME")
@@ -99,16 +145,45 @@ struct SettingsView: View {
             }
             Spacer()
             
-            Button("EDIT") { }
-                .font(DesignSystem.Typography.caption)
-                .bold()
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(DesignSystem.Colors.surface(scheme))
-                .cornerRadius(12)
-                .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
+            NavigationLink(destination: ProfileEditView()) {
+                Text("EDIT")
+                    .font(DesignSystem.Typography.caption).bold()
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(DesignSystem.Colors.background(scheme))
+                    .cornerRadius(12)
+            }
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, DesignSystem.Spacing.lg)
+    }
+}
+
+struct SettingRowContent: View {
+    let icon: String
+    let title: String
+    @Environment(\.colorScheme) var scheme
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
+                .frame(width: 32)
+            
+            Text(title)
+                .font(DesignSystem.Typography.footnote)
+                .bold()
+                .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
+            
+            Spacer()
+            
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
+        }
+        .padding()
+        .contentShape(Rectangle())
     }
 }
 
@@ -116,28 +191,9 @@ struct SettingActionRow: View {
     let icon: String
     let title: String
     let action: () -> Void
-    @Environment(\.colorScheme) var scheme
-    
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 16) {
-                Image(systemName: icon)
-                    .font(.system(size: 16))
-                    .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
-                    .frame(width: 32)
-                
-                Text(title)
-                    .font(DesignSystem.Typography.footnote)
-                    .bold()
-                    .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
-                
-                Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
-            }
-            .padding()
+            SettingRowContent(icon: icon, title: title)
         }
         .buttonStyle(.plain)
     }

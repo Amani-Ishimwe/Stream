@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct RequestMoneyFlow: View {
+    var preSelectedDestination: Institution? = nil
     @StateObject private var viewModel = TransactionViewModel()
     @State private var qrCodeGenerated = false
     @Environment(\.presentationMode) var presentationMode
@@ -22,6 +23,11 @@ struct RequestMoneyFlow: View {
                         .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity),
                                               removal: .move(edge: .leading).combined(with: .opacity)))
                 }
+            }
+        }
+        .onAppear {
+            if let dest = preSelectedDestination {
+                viewModel.selectedDestination = dest
             }
         }
     }

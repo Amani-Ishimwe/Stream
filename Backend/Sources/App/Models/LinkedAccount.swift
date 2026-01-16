@@ -25,10 +25,15 @@ final class LinkedAccount: Model, Content {
     @Field(key: "is_frozen")
     var isFrozen: Bool
 
-    
+    @Field(key: "daily_limit")
+    var dailyLimit: Double
+
+    @Field(key: "monthly_limit")
+    var monthlyLimit: Double
+
     init() { }
     
-    init(id: UUID? = nil, userID: UUID, institutionID: UUID, accountNumber: String, balance: Double) {
+    init(id: UUID? = nil, userID: UUID, institutionID: UUID, accountNumber: String, balance: Double, dailyLimit: Double = 1000000, monthlyLimit: Double = 5000000) {
         self.id = id
         self.$user.id = userID
         self.$institution.id = institutionID
@@ -36,5 +41,7 @@ final class LinkedAccount: Model, Content {
         self.balance = balance
         self.lastSynced = Date()
         self.isFrozen = false
+        self.dailyLimit = dailyLimit
+        self.monthlyLimit = monthlyLimit
     }
 }

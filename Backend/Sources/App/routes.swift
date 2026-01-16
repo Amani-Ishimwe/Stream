@@ -6,6 +6,10 @@ func routes(_ app: Application) throws {
         "SwiftPay Plus Backend is running!"
     }
 
+    app.get("health") { req -> [String: String] in
+        return ["status": "ok"]
+    }
+    
     try app.register(collection: UserController())
     try app.register(collection: AuthController()) // [NEW]
     try app.register(collection: TransactionController())

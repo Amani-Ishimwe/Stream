@@ -26,9 +26,15 @@ final class User: Model, Content, @unchecked Sendable {
     @Field(key: "balance")
     var balance: Double
 
+    @Field(key: "avatar_url")
+    var avatarUrl: String?
+
+    @Field(key: "token_version")
+    var tokenVersion: Int
+
     init() { }
 
-    init(id: UUID? = nil, name: String, email: String, phone: String, pin: String, passwordHash: String, balance: Double = 0.0) {
+    init(id: UUID? = nil, name: String, email: String, phone: String, pin: String, passwordHash: String, balance: Double = 0.0, avatarUrl: String? = nil, tokenVersion: Int = 1) {
         self.id = id
         self.name = name
         self.email = email
@@ -36,6 +42,8 @@ final class User: Model, Content, @unchecked Sendable {
         self.pin = pin
         self.passwordHash = passwordHash
         self.balance = balance
+        self.avatarUrl = avatarUrl
+        self.tokenVersion = tokenVersion
     }
 }
 
@@ -53,8 +61,9 @@ struct UserPayload: JWTPayload, Authenticatable {
     var sub: SubjectClaim
     var name: String
     var email: String
+    var tokenVersion: Int
     
     func verify(using signer: JWTSigner) throws {
-        // Here you can verify expiration, etc.
+        // Expiration check could be added here
     }
 }
