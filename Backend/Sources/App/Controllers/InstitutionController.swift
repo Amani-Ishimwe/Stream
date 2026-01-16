@@ -5,12 +5,99 @@ struct InstitutionController: RouteCollection {
     func boot(routes: RoutesBuilder) throws {
         let institutions = routes.grouped("institutions").grouped(SessionValidationMiddleware())
         institutions.get(use: index)
+        institutions.get("available", use: getAvailable)
+        institutions.post("link", use: linkInstitution)
         institutions.get(":institutionID", use: getDetail)
         institutions.get(":institutionID", "transactions", use: getTransactions)
         institutions.post(":institutionID", "freeze", use: toggleFreeze)
+        institutions.post(":institutionID", "limits", use: updateLimits)
+    }
+    
+    struct UpdateLimitsRequest: Content {
+        let dailyLimit: Double
+        let monthlyLimit: Double
+    }
+
+    // POST /institutions/:id/limits
+    @Sendable
+    func updateLimits(req: Request) async throws -> StreamResponse<InstitutionDTO> {
+        let user = try req.auth.require(User.self)
+        let userId = try user.requireID()
+        let instID = try req.parameters.require("institutionID", as: UUID.self)
+        let input = try req.content.decode(UpdateLimitsRequest.self)
+        
+        guard let linked = try await LinkedAccount.query(on: req.db)
+            .filter(\.$user.$id == userId)
+            .filter(\.$institution.$id == instID)
+            .with(\.$institution)
+            .first() else {
+            throw Abort(.notFound)
+        }
+        
+        linked.dailyLimit = input.dailyLimit
+        linked.monthlyLimit = input.monthlyLimit
+        try await linked.save(on: req.db)
+        
+        return StreamResponse(success: true, message: "Limits updated successfully", data: InstitutionDTO(linked: linked))
+    }
+    
+    // GET /institutions/available
+    @Sendable
+    func getAvailable(req: Request) async throws -> StreamResponse<[Institution]> {
+        let all = try await Institution.query(on: req.db).filter(\.$isActive == true).all()
+        return StreamResponse(success: true, data: all)
+    }
+
+    struct LinkRequest: Content {
+        let institutionId: UUID
+        let balance: Double?
+    }
+
+    // POST /institutions/link
+    @Sendable
+    func linkInstitution(req: Request) async throws -> StreamResponse<InstitutionDTO> {
+        let user = try req.auth.require(User.self)
+        let userId = try user.requireID()
+        let input = try req.content.decode(LinkRequest.self)
+        
+        // Check if already linked
+        let existing = try await LinkedAccount.query(on: req.db)
+            .filter(\.$user.$id == userId)
+            .filter(\.$institution.$id == input.institutionId)
+            .first()
+        
+        if existing != nil {
+            throw Abort(.badRequest, reason: "Institution already linked")
+        }
+        
+        guard try await Institution.find(input.institutionId, on: req.db) != nil else {
+            throw Abort(.notFound, reason: "Institution not found")
+        }
+        
+        let newLinked = LinkedAccount(
+            userID: userId,
+            institutionID: input.institutionId,
+            accountNumber: "STREAM-\(Int.random(in: 1000...9999))-\(Int.random(in: 1000...9999))",
+            balance: input.balance ?? 0.0,
+            dailyLimit: 2000000,
+            monthlyLimit: 10000000
+        )
+        
+        try await newLinked.save(on: req.db)
+        
+        // Reload with institution for DTO
+        guard let reloaded = try await LinkedAccount.query(on: req.db)
+            .filter(\.$id == newLinked.id!)
+            .with(\.$institution)
+            .first() else {
+            throw Abort(.internalServerError)
+        }
+        
+        return StreamResponse(success: true, message: "Institution linked successfully", data: InstitutionDTO(linked: reloaded))
     }
     
     // POST /institutions/:id/freeze
+    @Sendable
     func toggleFreeze(req: Request) async throws -> StreamResponse<InstitutionDTO> {
         let user = try req.auth.require(User.self)
         let userId = try user.requireID()
@@ -66,6 +153,7 @@ struct InstitutionController: RouteCollection {
     }
     
     // GET /institutions
+    @Sendable
     func index(req: Request) async throws -> StreamResponse<[InstitutionDTO]> {
         let user = try req.auth.require(User.self)
         let userId = try user.requireID()
@@ -80,6 +168,7 @@ struct InstitutionController: RouteCollection {
     }
 
     // GET /institutions/:id
+    @Sendable
     func getDetail(req: Request) async throws -> StreamResponse<InstitutionDTO> {
         let user = try req.auth.require(User.self)
         let userId = try user.requireID()
@@ -97,6 +186,7 @@ struct InstitutionController: RouteCollection {
     }
 
     // GET /institutions/:id/transactions
+    @Sendable
     func getTransactions(req: Request) async throws -> StreamResponse<[Transaction]> {
         let user = try req.auth.require(User.self)
         let userId = try user.requireID()

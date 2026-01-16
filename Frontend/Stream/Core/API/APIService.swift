@@ -131,12 +131,26 @@ class APIService: ObservableObject {
         return try await request("/institutions")
     }
     
+    func fetchAvailableInstitutions() async throws -> StreamResponse<[Institution]> {
+        return try await request("/institutions/available")
+    }
+    
+    func linkInstitution(id: UUID, balance: Double = 0) async throws -> StreamResponse<Institution> {
+        let dto = LinkInstitutionDTO(institutionId: id, balance: balance)
+        return try await request("/institutions/link", method: "POST", body: dto)
+    }
+    
     func fetchInstitutionTransactions(id: UUID) async throws -> StreamResponse<[Transaction]> {
         return try await request("/institutions/\(id.uuidString)/transactions")
     }
     
     func toggleFreeze(id: UUID) async throws -> StreamResponse<Institution> {
         return try await request("/institutions/\(id.uuidString)/freeze", method: "POST")
+    }
+    
+    func updateLimits(id: UUID, daily: Double, monthly: Double) async throws -> StreamResponse<Institution> {
+        let dto = UpdateLimitsDTO(dailyLimit: daily, monthlyLimit: monthly)
+        return try await request("/institutions/\(id.uuidString)/limits", method: "POST", body: dto)
     }
     
     // MARK: - Transactions
@@ -146,18 +160,18 @@ class APIService: ObservableObject {
     }
     
     func sendMoney(sourceId: UUID, recipient: String, amount: Double, metadata: [String: String]? = nil) async throws -> StreamResponse<Transaction> {
-        let body = SendMoneyDTO(sourceInstitutionID: sourceId, amount: amount, recipient: recipient, metadata: metadata)
-        return try await request("/transactions/send", method: "POST", body: body)
+        let dto = SendMoneyDTO(sourceInstitutionId: sourceId, amount: amount, recipient: recipient, metadata: metadata)
+        return try await request("/transactions/send", method: "POST", body: dto)
     }
     
     func topUp(sourceId: UUID, destinationId: UUID, amount: Double) async throws -> StreamResponse<Transaction> {
-        let body = TopUpDTO(sourceInstitutionID: sourceId, destinationInstitutionID: destinationId, amount: amount)
-        return try await request("/transactions/topup", method: "POST", body: body)
+        let dto = TopUpDTO(sourceInstitutionId: sourceId, destinationInstitutionId: destinationId, amount: amount)
+        return try await request("/transactions/topup", method: "POST", body: dto)
     }
     
     func requestMoney(destinationId: UUID, amount: Double, payer: String) async throws -> StreamResponse<Transaction> {
-        let body = RequestMoneyDTO(destinationInstitutionID: destinationId, amount: amount, payer: payer)
-        return try await request("/transactions/request", method: "POST", body: body)
+        let dto = RequestMoneyDTO(destinationInstitutionId: destinationId, amount: amount, payer: payer)
+        return try await request("/transactions/request", method: "POST", body: dto)
     }
 }
 

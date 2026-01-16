@@ -59,11 +59,19 @@ struct SeedData {
         if linkedCount == 0 {
             let institutions = try await Institution.query(on: db).all()
             for (index, inst) in institutions.enumerated() {
+                let accountNumber: String
+                if inst.name.contains("MTM") || inst.name.contains("MoMo") {
+                    accountNumber = "0788000000"
+                } else if inst.name.contains("Bank of Kigali") {
+                    accountNumber = "400455001234"
+                } else {
+                    accountNumber = "STREAM-\(Int.random(in: 1000...9999))-\(Int.random(in: 1000...9999))"
+                }
+                
                 // Generate a semi-random balanced for realism
                 let balances: [Double] = [1250000, 54000, 45000, 890000, 15000, 320000, 12000, 450000, 25000, 78000, 210000]
                 let balance = (index < balances.count) ? balances[index] : Double.random(in: 10000...500000)
                 
-                let accountNumber = "STREAM-\(Int.random(in: 1000...9999))-\(Int.random(in: 1000...9999))"
                 let linked = LinkedAccount(
                     userID: demoUser.id!,
                     institutionID: inst.id!,
@@ -79,8 +87,8 @@ struct SeedData {
         // 5. Seed Initial Transactions
         let txCount = try await Transaction.query(on: db).count()
         if txCount < 5 {
-            if let mtnLine = try await LinkedAccount.query(on: db).with(\.$institution).first(),
-               let bkLine = try await LinkedAccount.query(on: db).filter(\.$accountNumber == "4004 5500 1234").first() {
+            if let mtnLine = try await LinkedAccount.query(on: db).filter(\.$accountNumber == "0788000000").first(),
+               let bkLine = try await LinkedAccount.query(on: db).filter(\.$accountNumber == "400455001234").first() {
                  let txs = [
                     Transaction(type: "RECEIVE", amount: 250000, description: "Monthly Salary", counterparty: "Tunga Inc", status: "Completed", userID: demoUser.id!, destinationInstitutionID: bkLine.$institution.id),
                     Transaction(type: "SEND", amount: -5000, description: "Internet Bundle", counterparty: "MTN Rwanda", status: "Completed", userID: demoUser.id!, sourceInstitutionID: mtnLine.$institution.id),

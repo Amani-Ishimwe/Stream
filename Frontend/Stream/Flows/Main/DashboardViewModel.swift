@@ -22,7 +22,7 @@ class DashboardViewModel: ObservableObject {
             let instResponse = try await api.fetchInstitutions()
             if instResponse.success, let data = instResponse.data {
                 self.institutions = data
-                self.totalBalance = data.reduce(0) { $0 + $1.balance }
+                self.totalBalance = data.reduce(0) { $0 + ($1.balance ?? 0) }
             }
             
             // Fetch Recent Transactions

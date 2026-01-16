@@ -99,7 +99,7 @@ struct TopUpSourceStep: View {
                                     Text(inst.name.uppercased())
                                         .font(DesignSystem.Typography.footnote)
                                         .bold()
-                                    Text("AVAIL: \(Int(inst.balance)) RWF")
+                                    Text("AVAIL: \(Int(inst.balance ?? 0)) RWF")
                                         .font(DesignSystem.Typography.caption)
                                         .monospacedDigit()
                                         .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
@@ -277,7 +277,7 @@ struct TopUpConfirmStep: View {
                 .font(DesignSystem.Typography.title)
                 .bold()
             
-            Text("We could not process this capital infusion. Please check your source balance.")
+            Text(viewModel.errorMessage ?? "We could not process this capital infusion. Please check your source balance.")
                 .font(DesignSystem.Typography.body)
                 .multilineTextAlignment(.center)
                 .foregroundColor(DesignSystem.Colors.textSecondary(scheme))

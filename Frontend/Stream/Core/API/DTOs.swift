@@ -22,22 +22,27 @@ struct SignupResponse: Decodable {
     let message: String
 }
 
+struct LinkInstitutionDTO: Encodable {
+    let institutionId: UUID
+    let balance: Double
+}
+
 // MARK: - Transaction DTOs
 struct SendMoneyDTO: Encodable {
-    let sourceInstitutionID: UUID
+    let sourceInstitutionId: UUID
     let amount: Double
     let recipient: String
     let metadata: [String: String]?
 }
 
 struct TopUpDTO: Encodable {
-    let sourceInstitutionID: UUID
-    let destinationInstitutionID: UUID
+    let sourceInstitutionId: UUID
+    let destinationInstitutionId: UUID
     let amount: Double
 }
 
 struct RequestMoneyDTO: Encodable {
-    let destinationInstitutionID: UUID
+    let destinationInstitutionId: UUID
     let amount: Double
     let payer: String
 }
@@ -47,6 +52,11 @@ struct UpdateProfileDTO: Encodable {
     let name: String
     let phone: String
     let avatarUrl: String?
+}
+
+struct UpdateLimitsDTO: Encodable {
+    let dailyLimit: Double
+    let monthlyLimit: Double
 }
 
 struct ChangePinDTO: Encodable {

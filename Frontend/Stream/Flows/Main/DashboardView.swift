@@ -10,6 +10,7 @@ struct DashboardView: View {
     @State private var showRequestFlow = false
     @State private var showTopUpFlow = false
     @State private var showScanner = false
+    @State private var showLinkFlow = false
     
     var body: some View {
         ZStack {
@@ -39,6 +40,7 @@ struct DashboardView: View {
         .sheet(isPresented: $showRequestFlow) { RequestMoneyFlow() }
         .sheet(isPresented: $showTopUpFlow) { TopUpFlow() }
         .fullScreenCover(isPresented: $showScanner) { QRScannerView() }
+        .sheet(isPresented: $showLinkFlow) { LinkInstitutionFlow() }
     }
     
     // MARK: - Components
@@ -115,7 +117,7 @@ struct DashboardView: View {
                             Text(inst.name)
                                 .font(DesignSystem.Typography.footnote)
                             Spacer()
-                            Text("\(Int(inst.balance)) RWF")
+                            Text("\(Int(inst.balance ?? 0)) RWF")
                                 .font(DesignSystem.Typography.footnote)
                                 .bold()
                         }
@@ -157,10 +159,17 @@ struct DashboardView: View {
     
     private var institutionSection: some View {
         VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
-            Text("INSTITUTIONS")
-                .font(DesignSystem.Typography.caption)
-                .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
-                .padding(.horizontal, DesignSystem.Spacing.lg)
+            HStack {
+                Text("INSTITUTIONS")
+                    .font(DesignSystem.Typography.caption)
+                    .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
+                Spacer()
+                Button(action: { showLinkFlow = true }) {
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
+                }
+            }
+            .padding(.horizontal, DesignSystem.Spacing.lg)
             
             VStack(spacing: DesignSystem.Spacing.sm) {
                 if viewModel.isLoading {
@@ -262,12 +271,12 @@ struct InstitutionRow: View {
             Spacer()
             
             VStack(alignment: .trailing, spacing: 2) {
-                Text("\(Int(institution.balance))")
+                Text("\(Int(institution.balance ?? 0))")
                     .font(DesignSystem.Typography.headline)
                     .monospacedDigit()
-                Text(institution.isFrozen ? "FROZEN" : "ACTIVE")
+                Text((institution.isFrozen ?? false) ? "FROZEN" : "ACTIVE")
                     .font(DesignSystem.Typography.caption)
-                    .foregroundColor(institution.isFrozen ? DesignSystem.Colors.textPrimary(scheme).opacity(0.5) : DesignSystem.Colors.textPrimary(scheme))
+                    .foregroundColor((institution.isFrozen ?? false) ? DesignSystem.Colors.textPrimary(scheme).opacity(0.5) : DesignSystem.Colors.textPrimary(scheme))
             }
         }
         .padding(DesignSystem.Spacing.md)

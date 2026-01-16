@@ -13,6 +13,7 @@ struct TransactionController: RouteCollection {
     }
 
     // GET /transactions
+    @Sendable
     func index(req: Request) async throws -> StreamResponse<[Transaction]> {
         let user = try req.auth.require(User.self)
         let transactions = try await Transaction.query(on: req.db)
@@ -24,31 +25,32 @@ struct TransactionController: RouteCollection {
 
     // DTOs
     struct SendMoneyRequest: Content {
-        let sourceInstitutionID: UUID
+        let sourceInstitutionId: UUID
         let amount: Double
         let recipient: String
         let metadata: [String: String]?
     }
 
     struct TopUpRequest: Content {
-        let sourceInstitutionID: UUID
-        let destinationInstitutionID: UUID
+        let sourceInstitutionId: UUID
+        let destinationInstitutionId: UUID
         let amount: Double
     }
 
     struct RequestMoneyRequest: Content {
-        let destinationInstitutionID: UUID
+        let destinationInstitutionId: UUID
         let amount: Double
         let payer: String
     }
     
     // POST /transactions/send
+    @Sendable
     func sendMoney(req: Request) async throws -> StreamResponse<Transaction> {
         let user = try req.auth.require(User.self)
         let input = try req.content.decode(SendMoneyRequest.self)
         let result = try await transactionService.performSend(
             user: user,
-            sourceID: input.sourceInstitutionID,
+            sourceID: input.sourceInstitutionId,
             amount: input.amount,
             recipient: input.recipient,
             metadata: input.metadata,
@@ -64,13 +66,14 @@ struct TransactionController: RouteCollection {
     }
     
     // POST /transactions/topup
+    @Sendable
     func topUp(req: Request) async throws -> StreamResponse<Transaction> {
         let user = try req.auth.require(User.self)
         let input = try req.content.decode(TopUpRequest.self)
         let result = try await transactionService.performTopUp(
             user: user,
-            sourceID: input.sourceInstitutionID,
-            destinationID: input.destinationInstitutionID,
+            sourceID: input.sourceInstitutionId,
+            destinationID: input.destinationInstitutionId,
             amount: input.amount,
             on: req.db
         )
@@ -84,12 +87,13 @@ struct TransactionController: RouteCollection {
     }
     
     // POST /transactions/request
+    @Sendable
     func requestMoney(req: Request) async throws -> StreamResponse<Transaction> {
         let user = try req.auth.require(User.self)
         let input = try req.content.decode(RequestMoneyRequest.self)
         let result = try await transactionService.performRequest(
             user: user,
-            destinationID: input.destinationInstitutionID,
+            destinationID: input.destinationInstitutionId,
             amount: input.amount,
             payer: input.payer,
             on: req.db

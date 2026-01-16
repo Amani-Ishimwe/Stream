@@ -6,12 +6,12 @@ struct Institution: Codable, Identifiable {
     let type: String
     let iconSymbol: String
     let primaryColorHex: String
-    let balance: Double
+    let balance: Double?
     let accountNumber: String?
     let lastSynced: Date?
-    let isFrozen: Bool
-    let dailyLimit: Double
-    let monthlyLimit: Double
+    let isFrozen: Bool?
+    let dailyLimit: Double?
+    let monthlyLimit: Double?
 }
 
 struct Transaction: Codable, Identifiable {

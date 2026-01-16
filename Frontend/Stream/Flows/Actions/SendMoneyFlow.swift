@@ -229,7 +229,7 @@ struct SourceSelectionStep: View {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(inst.name.uppercased())
                                             .font(DesignSystem.Typography.footnote).bold()
-                                        Text("\(Int(inst.balance)) RWF AVAILABLE")
+                                        Text("\(Int(inst.balance ?? 0)) RWF AVAILABLE")
                                             .font(DesignSystem.Typography.caption)
                                             .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
                                     }
@@ -352,9 +352,9 @@ struct ConfirmStep: View {
                 if let error = viewModel.errorMessage {
                     Text(error)
                         .font(DesignSystem.Typography.caption)
-                        .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
+                        .foregroundColor(.red)
                         .padding()
-                        .background(DesignSystem.Colors.softBeige.opacity(0.3))
+                        .background(Color.red.opacity(0.1))
                         .cornerRadius(8)
                 }
                 
