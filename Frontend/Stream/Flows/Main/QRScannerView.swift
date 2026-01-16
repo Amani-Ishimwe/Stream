@@ -6,16 +6,11 @@ struct QRScannerView: View {
     @Environment(\.presentationMode) var presentationMode
     @Environment(\.colorScheme) var scheme
     @State private var isScanning = true
-    @State private var scannedResult: String? {
-        didSet {
-            if let result = scannedResult {
-                onScan?(result)
-                presentationMode.wrappedValue.dismiss()
-            }
-        }
-    }
+    @State private var scannedResult: String?
     @State private var showPhotoPicker = false
     @State private var selectedItem: PhotosPickerItem?
+    @State private var errorMessage: String?
+    @State private var showError = false
     
     var onScan: ((String) -> Void)? = nil
     
@@ -42,16 +37,41 @@ struct QRScannerView: View {
         .photosPicker(isPresented: $showPhotoPicker, selection: $selectedItem, matching: .images)
         .onChange(of: selectedItem) { newItem in
             Task {
-                if let data = try? await newItem?.loadTransferable(type: Data.self),
-                   let image = UIImage(data: data) {
+                do {
+                    print("DEBUG: Processing selected gallery item...")
+                    guard let item = newItem else { return }
+                    guard let data = try await item.loadTransferable(type: Data.self) else {
+                        throw NSError(domain: "Scanner", code: 0, userInfo: [NSLocalizedDescriptionKey: "Failed to load image data"])
+                    }
+                    guard let image = UIImage(data: data) else {
+                        throw NSError(domain: "Scanner", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid image format"])
+                    }
+                    
+                    print("DEBUG: Image loaded, size: \(image.size). Attempting QR detection...")
                     if let result = QRScannerUtils.detectQRCode(from: image) {
+                        print("DEBUG: QR Detected from gallery: \(result)")
                         scannedResult = result
                     } else {
-                        // Handle no QR found (optional)
-                        print("No QR code found in selected image")
+                        throw NSError(domain: "Scanner", code: 0, userInfo: [NSLocalizedDescriptionKey: "No QR code detected in this image"])
                     }
+                } catch {
+                    print("DEBUG: Gallery Error: \(error.localizedDescription)")
+                    self.errorMessage = error.localizedDescription
+                    self.showError = true
                 }
             }
+        }
+        .onChange(of: scannedResult) { newValue in
+            if let result = newValue {
+                print("DEBUG: scannedResult changed, notifying parent: \(result)")
+                onScan?(result)
+                presentationMode.wrappedValue.dismiss()
+            }
+        }
+        .alert("SCANNER ERROR", isPresented: $showError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage ?? "Unknown error")
         }
     }
     

@@ -65,7 +65,9 @@ struct ChangePinDTO: Encodable {
 }
 
 // MARK: - QR DTOs
-struct QRPayload: Codable {
+struct QRPayload: Codable, Identifiable {
+    var id: String { signature ?? UUID().uuidString }
+    
     enum PayloadType: String, Codable {
         case send = "SEND"
         case request = "REQUEST"

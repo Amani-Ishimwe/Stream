@@ -29,6 +29,14 @@ struct RequestMoneyFlow: View {
         .onAppear {
             if let dest = preSelectedDestination {
                 viewModel.selectedDestination = dest
+            } else {
+                // Default to first linked institution
+                Task {
+                    let response = try await APIService.shared.fetchInstitutions()
+                    if let first = response.data?.first {
+                        viewModel.selectedDestination = first
+                    }
+                }
             }
         }
     }

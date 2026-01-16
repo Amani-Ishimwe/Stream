@@ -172,27 +172,79 @@ final class TransactionService: Sendable {
     }
 
     // Dispatcher for QR-originated transactions
-    func performQRTransaction(user: User, payload: QRPayload, on db: Database) async throws -> TransactionResult {
+    func performQRTransaction(user: User, payload: QRPayload, overrideSourceID: UUID? = nil, on db: Database) async throws -> TransactionResult {
         switch payload.type {
         case .send:
-            guard let sourceId = payload.sourceId else { throw Abort(.badRequest, reason: "Source ID missing for SEND") }
+            let sourceId = overrideSourceID ?? payload.sourceId
+            guard let sid = sourceId else { throw Abort(.badRequest, reason: "Source ID missing for SEND") }
             return try await performSend(
                 user: user,
-                sourceID: sourceId,
+                sourceID: sid,
                 amount: payload.amount,
-                recipient: "QR Recipient", // In a real app, this might be encoded in the QR
+                recipient: "QR Recipient",
                 metadata: ["source": "QR_SCAN"],
                 on: db
             )
         case .request:
             guard let destId = payload.destinationId else { throw Abort(.badRequest, reason: "Destination ID missing for REQUEST") }
-            return try await performRequest(
-                user: user,
-                destinationID: destId,
-                amount: payload.amount,
-                payer: "QR Payer",
-                on: db
-            )
+            let sourceId = overrideSourceID ?? payload.sourceId
+            
+            // If scanning a REQUEST, we perform a transfer from the PAYER to the REQUESTER
+            if let sid = sourceId {
+                 return try await db.transaction { transactionDB in
+                    let userID = try user.requireID()
+                    
+                    guard let destAccount = try await LinkedAccount.query(on: transactionDB)
+                        .filter(\.$institution.$id == destId)
+                        .first() else {
+                        throw Abort(.notFound, reason: "Destination account not found.")
+                    }
+
+                    guard let sourceAccount = try await LinkedAccount.query(on: transactionDB)
+                        .filter(\.$user.$id == userID)
+                        .filter(\.$institution.$id == sid)
+                        .first() else {
+                        throw Abort(.notFound, reason: "Your source account not found.")
+                    }
+                    
+                    guard sourceAccount.balance >= payload.amount else {
+                        throw Abort(.badRequest, reason: "Insufficient balance.")
+                    }
+                    
+                    sourceAccount.balance -= payload.amount
+                    try await sourceAccount.save(on: transactionDB)
+                    
+                    destAccount.balance += payload.amount
+                    try await destAccount.save(on: transactionDB)
+                    
+                    let transaction = Transaction(
+                        type: "SEND",
+                        amount: -payload.amount,
+                        description: "QR Payment to \(destId)",
+                        counterparty: "QR Recipient",
+                        status: "Completed",
+                        userID: userID,
+                        sourceInstitutionID: sid,
+                        destinationInstitutionID: destId
+                    )
+                    try await transaction.save(on: transactionDB)
+                    
+                    return TransactionResult(
+                        transaction: transaction,
+                        updatedBalances: [
+                            BalanceUpdate(institutionId: sid, newBalance: sourceAccount.balance)
+                        ]
+                    )
+                 }
+            } else {
+                return try await performRequest(
+                    user: user,
+                    destinationID: destId,
+                    amount: payload.amount,
+                    payer: "QR Payer",
+                    on: db
+                )
+            }
         case .topup:
             guard let sourceId = payload.sourceId, let destId = payload.destinationId else {
                 throw Abort(.badRequest, reason: "Source or Destination ID missing for TOPUP")

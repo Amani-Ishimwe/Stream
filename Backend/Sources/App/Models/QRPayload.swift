@@ -28,21 +28,41 @@ public struct QRPayload: Content, Sendable {
 
     // Signing logic using a secret key
     public mutating func sign(secret: String) {
-        let dataToSign = "\(type.rawValue):\(amount):\(sourceId?.uuidString ?? ""):\(destinationId?.uuidString ?? ""):\(transactionId?.uuidString ?? ""):\(expiresAt.timeIntervalSince1970)"
+        let timestamp = Int(expiresAt.timeIntervalSince1970)
+        let amountStr = String(format: "%.2f", amount)
+        let dataToSign = "\(type.rawValue):\(amountStr):\(sourceId?.uuidString ?? ""):\(destinationId?.uuidString ?? ""):\(transactionId?.uuidString ?? ""):\(timestamp)"
         let key = SymmetricKey(data: Data(secret.utf8))
         let signatureData = HMAC<SHA256>.authenticationCode(for: Data(dataToSign.utf8), using: key)
         self.signature = Data(signatureData).base64EncodedString()
     }
 
     public func verify(secret: String) -> Bool {
-        guard let signature = self.signature else { return false }
-        guard expiresAt > Date() else { return false }
+        guard let signature = self.signature else { 
+            print("QR VERIFY: No signature in payload")
+            return false 
+        }
         
-        let dataToSign = "\(type.rawValue):\(amount):\(sourceId?.uuidString ?? ""):\(destinationId?.uuidString ?? ""):\(transactionId?.uuidString ?? ""):\(expiresAt.timeIntervalSince1970)"
+        let now = Date()
+        if expiresAt <= now {
+            print("QR VERIFY: Expired. Expires: \(expiresAt), Now: \(now)")
+            return false
+        }
+        
+        let timestamp = Int(expiresAt.timeIntervalSince1970)
+        let amountStr = String(format: "%.2f", amount)
+        let dataToSign = "\(type.rawValue):\(amountStr):\(sourceId?.uuidString ?? ""):\(destinationId?.uuidString ?? ""):\(transactionId?.uuidString ?? ""):\(timestamp)"
         let key = SymmetricKey(data: Data(secret.utf8))
         let expectedSignatureData = HMAC<SHA256>.authenticationCode(for: Data(dataToSign.utf8), using: key)
         let expectedSignature = Data(expectedSignatureData).base64EncodedString()
         
-        return signature == expectedSignature
+        let isValid = signature == expectedSignature
+        if !isValid {
+            print("QR VERIFY: Signature Mismatch!")
+            print(" - DataToSign: [\(dataToSign)]")
+            print(" - Received Signature: [\(signature)]")
+            print(" - Expected Signature: [\(expectedSignature)]")
+        }
+        
+        return isValid
     }
 }

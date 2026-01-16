@@ -184,8 +184,13 @@ class APIService: ObservableObject {
         return try await request("/transactions/qr/generate", method: "POST", body: dto)
     }
 
-    func executeQR(payload: QRPayload, pin: String? = nil) async throws -> StreamResponse<Transaction> {
-        let dto = QRExecuteDTO(payload: payload, pin: pin)
+    func executeQR(payload: QRPayload, pin: String? = nil, sourceId: UUID? = nil) async throws -> StreamResponse<Transaction> {
+        struct QRExecuteDTO: Encodable {
+            let payload: QRPayload
+            let pin: String?
+            let sourceInstitutionId: UUID?
+        }
+        let dto = QRExecuteDTO(payload: payload, pin: pin, sourceInstitutionId: sourceId)
         return try await request("/transactions/qr/execute", method: "POST", body: dto)
     }
 }

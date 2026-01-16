@@ -12,6 +12,8 @@ struct QRPaymentFlow: View {
     @State private var errorMessage: String?
     @State private var success = false
     @State private var destinationInstitution: Institution?
+    @State private var sourceInstitutions: [Institution] = []
+    @State private var selectedSourceId: UUID?
     
     var body: some View {
         ZStack {
@@ -20,23 +22,31 @@ struct QRPaymentFlow: View {
             if success {
                 successView
             } else {
-                VStack(spacing: 32) {
-                    header
-                    
-                    detailsCard
-                    
-                    authSection
-                    
-                    Spacer()
-                    
-                    confirmButton
+                ScrollView {
+                    VStack(spacing: 32) {
+                        header
+                        
+                        detailsCard
+                        
+                        authSection
+                        
+                        confirmButton
+                        
+                        if let error = errorMessage {
+                            Text(error)
+                                .font(DesignSystem.Typography.caption)
+                                .foregroundColor(.red)
+                                .multilineTextAlignment(.center)
+                        }
+                    }
+                    .padding(24)
                 }
-                .padding(24)
             }
         }
         .disabled(isProcessing)
         .onAppear {
             fetchDestinationInfo()
+            fetchAvailableSources()
         }
     }
     
@@ -54,11 +64,26 @@ struct QRPaymentFlow: View {
         }
     }
     
+    private func fetchAvailableSources() {
+        Task {
+            do {
+                let response = try await APIService.shared.fetchInstitutions()
+                if response.success {
+                    self.sourceInstitutions = response.data ?? []
+                    self.selectedSourceId = sourceInstitutions.first?.id
+                }
+            } catch {
+                print("Failed to fetch sources: \(error)")
+            }
+        }
+    }
+    
     private var header: some View {
         VStack(spacing: 8) {
             Text("CONFIRM TRANSACTION")
                 .font(DesignSystem.Typography.headline)
                 .tracking(2)
+                .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
             
             if let inst = destinationInstitution {
                 Text("PAYING \(inst.name.uppercased())")
@@ -91,6 +116,25 @@ struct QRPaymentFlow: View {
                 Spacer()
                 QRDetailRow(label: "EXPIRES", value: payload.expiresAt.formatted(date: .omitted, time: .shortened))
             }
+            
+            if !sourceInstitutions.isEmpty {
+                Divider()
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("PAY FROM")
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
+                    
+                    Picker("Source", selection: $selectedSourceId) {
+                        ForEach(sourceInstitutions) { inst in
+                            Text(inst.name).tag(inst.id as UUID?)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .tint(DesignSystem.Colors.textPrimary(scheme))
+                    .padding(.horizontal, -12) // Align with text
+                }
+            }
         }
         .padding(24)
         .background(DesignSystem.Colors.surface(scheme))
@@ -101,11 +145,13 @@ struct QRPaymentFlow: View {
         VStack(spacing: 16) {
             Text("ENTER TRANSACTION PIN")
                 .font(DesignSystem.Typography.caption).bold()
+                .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
             
             SecureField("••••", text: $pin)
                 .keyboardType(.numberPad)
                 .multilineTextAlignment(.center)
                 .font(.title).bold()
+                .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
                 .padding()
                 .frame(width: 160)
                 .background(DesignSystem.Colors.surface(scheme))
@@ -154,7 +200,11 @@ struct QRPaymentFlow: View {
         
         Task {
             do {
-                let response = try await APIService.shared.executeQR(payload: payload, pin: pin)
+                let response = try await APIService.shared.executeQR(
+                    payload: payload, 
+                    pin: pin, 
+                    sourceId: selectedSourceId
+                )
                 if response.success {
                     withAnimation { success = true }
                 } else {

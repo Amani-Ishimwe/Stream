@@ -55,6 +55,7 @@ struct TransactionController: RouteCollection {
     struct QRExecuteRequest: Content {
         let payload: QRPayload
         let pin: String?
+        let sourceInstitutionId: UUID?
     }
     
     // POST /transactions/send
@@ -173,6 +174,7 @@ struct TransactionController: RouteCollection {
         let result = try await transactionService.performQRTransaction(
             user: user,
             payload: input.payload,
+            overrideSourceID: input.sourceInstitutionId,
             on: req.db
         )
 

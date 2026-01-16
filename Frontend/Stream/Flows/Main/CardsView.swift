@@ -11,7 +11,6 @@ struct CardsView: View {
     @State private var showingScanner = false
     @State private var activeQRPayload: QRPayload?
     @State private var qrPayload: QRPayload?
-    @State private var showQRPayment = false
     
     var body: some View {
         ZStack {
@@ -76,10 +75,13 @@ struct CardsView: View {
                 handleScanResult(result)
             }
         }
-        .sheet(isPresented: $showQRPayment) {
-            if let payload = activeQRPayload {
-                QRPaymentFlow(payload: payload)
-            }
+        .sheet(item: $activeQRPayload) { payload in
+            QRPaymentFlow(payload: payload)
+        }
+        .alert("QR ERROR", isPresented: $showDecodeError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(decodeErrorMessage ?? "Unknown decoding error")
         }
         .onAppear {
             Task { 
@@ -194,17 +196,45 @@ struct CardsView: View {
         )
     }
     
+    @State private var decodeErrorMessage: String?
+    @State private var showDecodeError = false
+    
     private func handleScanResult(_ result: String) {
-        if let data = result.data(using: .utf8) {
+        print("DEBUG: Scanned result string: \(result)")
+        
+        var cleanJson = result.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let start = cleanJson.range(of: "{")?.lowerBound,
+           let end = cleanJson.range(of: "}", options: .backwards)?.upperBound {
+            cleanJson = String(cleanJson[start..<end])
+        }
+        
+        guard let data = cleanJson.data(using: .utf8) else { return }
+
+        let strategies: [(JSONDecoder.DateDecodingStrategy, JSONDecoder.KeyDecodingStrategy)] = [
+            (.iso8601, .useDefaultKeys),
+            (.secondsSince1970, .useDefaultKeys),
+            (.iso8601, .convertFromSnakeCase),
+            (.secondsSince1970, .convertFromSnakeCase)
+        ]
+
+        for (dateStr, keyStr) in strategies {
             let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
+            decoder.dateDecodingStrategy = dateStr
+            decoder.keyDecodingStrategy = keyStr
             if let payload = try? decoder.decode(QRPayload.self, from: data) {
-                // Add a small delay to allow the scanner to dismiss fully
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    self.activeQRPayload = payload
-                    self.showQRPayment = true
-                }
+                processPayload(payload)
+                return
             }
+        }
+        
+        self.decodeErrorMessage = "INCORRECT FORMAT\n\nData: \(cleanJson.prefix(60))..."
+        self.showDecodeError = true
+    }
+
+    private func processPayload(_ payload: QRPayload) {
+        print("Successfully decoded QR Payload: \(payload)")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.activeQRPayload = payload
         }
     }
 
