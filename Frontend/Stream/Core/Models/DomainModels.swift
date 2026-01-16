@@ -1,6 +1,6 @@
 import Foundation
 
-struct Institution: Codable, Identifiable {
+struct Institution: Codable, Identifiable, Equatable {
     let id: UUID
     let name: String
     let type: String
@@ -14,7 +14,7 @@ struct Institution: Codable, Identifiable {
     let monthlyLimit: Double?
 }
 
-struct Transaction: Codable, Identifiable {
+struct Transaction: Codable, Identifiable, Equatable {
     let id: UUID
     let type: String
     let amount: Double

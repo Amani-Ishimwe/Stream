@@ -1,8 +1,9 @@
 import SwiftUI
 import Combine
+import Photos
 
 struct InstitutionDetailView: View {
-    let institution: Institution
+    @State var institution: Institution
     @Environment(\.colorScheme) var scheme
     @Environment(\.presentationMode) var presentationMode
     @StateObject private var viewModel = InstitutionDetailViewModel()
@@ -46,15 +47,23 @@ struct InstitutionDetailView: View {
             }
         }
         .onAppear {
-            Task { await viewModel.fetchTransactions(for: institution.id) }
+            viewModel.institution = institution
+            Task {
+                await viewModel.refreshAll()
+            }
         }
-        .sheet(isPresented: $showSend) {
+        .onChange(of: viewModel.institution) { newValue in
+            if let newValue = newValue {
+                self.institution = newValue
+            }
+        }
+        .sheet(isPresented: $showSend, onDismiss: { Task { await viewModel.refreshAll() } }) {
             SendMoneyFlow(preSelectedSource: institution)
         }
-        .sheet(isPresented: $showTopUp) {
+        .sheet(isPresented: $showTopUp, onDismiss: { Task { await viewModel.refreshAll() } }) {
             TopUpFlow(preSelectedSource: institution)
         }
-        .sheet(isPresented: $showRequest) {
+        .sheet(isPresented: $showRequest, onDismiss: { Task { await viewModel.refreshAll() } }) {
             RequestMoneyFlow(preSelectedDestination: institution)
         }
         .sheet(isPresented: $showLimitEdit) {
@@ -89,7 +98,7 @@ struct InstitutionDetailView: View {
     private var balanceCard: some View {
         VStack(spacing: DesignSystem.Spacing.md) {
             VStack(spacing: 4) {
-                Text("CURRENT BALANCE")
+                Text("CURRENT ASSET VALUE")
                     .font(DesignSystem.Typography.caption)
                     .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
                 
@@ -181,27 +190,44 @@ struct InstitutionDetailView: View {
     
     private var qrCodeBack: some View {
         VStack(spacing: DesignSystem.Spacing.md) {
-            Text("SCAN TO PAY \(institution.name.uppercased())")
+            Text("SECURE PAYMENT QR")
                 .font(DesignSystem.Typography.caption).bold()
                 .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
             
-            // Mock QR Code for now
-            ZStack {
-                Rectangle()
-                    .fill(DesignSystem.Colors.textPrimary(scheme).opacity(0.05))
-                    .frame(width: 160, height: 160)
-                    .cornerRadius(12)
-                
-                Image(systemName: "qrcode")
-                    .resizable()
-                    .interpolation(.none)
-                    .frame(width: 140, height: 140)
-                    .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
+            VStack {
+                if let payload = viewModel.qrPayload, let jsonData = try? JSONEncoder().encode(payload), let jsonString = String(data: jsonData, encoding: .utf8) {
+                    QRCodeView(data: jsonString)
+                        .frame(width: 140, height: 140)
+                        .padding(12)
+                        .background(Color.white)
+                        .cornerRadius(12)
+                        .shadow(color: DesignSystem.Colors.textPrimary(scheme).opacity(0.1), radius: 10)
+                } else {
+                    ProgressView()
+                        .frame(width: 140, height: 140)
+                        .onAppear {
+                            Task { await viewModel.generatePaymentQR() }
+                        }
+                }
             }
             
             Text(institution.accountNumber ?? "STREAM-USER-ID")
                 .font(DesignSystem.Typography.footnote).monospaced()
                 .opacity(0.6)
+            
+            Button(action: { viewModel.saveQRToPhotos() }) {
+                HStack {
+                    Image(systemName: "square.and.arrow.down")
+                    Text("SAVE TO PHOTOS")
+                        .font(DesignSystem.Typography.caption).bold()
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(DesignSystem.Colors.textPrimary(scheme))
+                .foregroundColor(DesignSystem.Colors.background(scheme))
+                .cornerRadius(20)
+            }
+            .padding(.top, 8)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, DesignSystem.Spacing.lg)
@@ -243,12 +269,44 @@ struct InstitutionDetailView: View {
 
 @MainActor
 class InstitutionDetailViewModel: ObservableObject {
+    @Published var institution: Institution?
     @Published var transactions: [Transaction] = []
     @Published var isLoading = false
     @Published var isFreezing = false
+    @Published var qrPayload: QRPayload?
     
-    func fetchTransactions(for id: UUID) async {
+    func refreshAll() async {
+        guard let id = institution?.id else { return }
         isLoading = true
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { await self.fetchDetail(id: id) }
+            group.addTask { await self.fetchTransactions(id: id) }
+        }
+        isLoading = false
+    }
+
+    func generatePaymentQR() async {
+        guard let id = institution?.id else { return }
+        do {
+            let response = try await APIService.shared.generateQR(type: .send, amount: 0, destinationId: id)
+            self.qrPayload = response.data
+        } catch {
+            print("Failed to generate QR: \(error)")
+        }
+    }
+    
+    private func fetchDetail(id: UUID) async {
+        do {
+            let response = try await APIService.shared.fetchInstitutionDetail(id: id)
+            if response.success, let data = response.data {
+                self.institution = data
+            }
+        } catch {
+            print("Failed to fetch detail: \(error)")
+        }
+    }
+    
+    private func fetchTransactions(id: UUID) async {
         do {
             let response = try await APIService.shared.fetchInstitutionTransactions(id: id)
             if response.success, let data = response.data {
@@ -257,15 +315,14 @@ class InstitutionDetailViewModel: ObservableObject {
         } catch {
             print("Failed to fetch inst transactions: \(error)")
         }
-        isLoading = false
     }
     
     func toggleFreeze(id: UUID) async {
         isFreezing = true
         do {
             let response = try await APIService.shared.toggleFreeze(id: id)
-            if response.success {
-                // Ideally refresh institution data here
+            if response.success, let data = response.data {
+                self.institution = data
             }
         } catch {
             print("Failed to toggle freeze: \(error)")
@@ -276,11 +333,48 @@ class InstitutionDetailViewModel: ObservableObject {
     func updateLimits(id: UUID, daily: Double, monthly: Double) async {
         do {
             let response = try await APIService.shared.updateLimits(id: id, daily: daily, monthly: monthly)
-            if response.success {
-                // Ideally refresh
+            if response.success, let data = response.data {
+                self.institution = data
             }
         } catch {
             print("Failed to update limits: \(error)")
+        }
+    }
+
+    func saveQRToPhotos() {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        
+        guard let payload = qrPayload,
+              let jsonData = try? encoder.encode(payload),
+              let jsonString = String(data: jsonData, encoding: .utf8) else { return }
+        
+        // Create a temporary view to render
+        let qrView = VStack(spacing: 16) {
+            Text("STREAM PAYMENT QR")
+                .font(.headline)
+            QRCodeView(data: jsonString)
+                .frame(width: 200, height: 200)
+                .padding()
+                .background(Color.white)
+            Text(institution?.name ?? "STREAM")
+                .font(.subheadline)
+        }
+        .padding(40)
+        .background(Color.white)
+        
+        let renderer = ImageRenderer(content: qrView)
+        renderer.scale = UIScreen.main.scale
+        
+        if let uiImage = renderer.uiImage {
+            PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+                if status == .authorized || status == .limited {
+                    UIImageWriteToSavedPhotosAlbum(uiImage, nil, nil, nil)
+                    print("QR Saved to Photos")
+                } else {
+                    print("Photo Library Access Denied")
+                }
+            }
         }
     }
 }

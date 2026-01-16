@@ -15,6 +15,7 @@ class TransactionViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var successMessage: String?
     @Published var transactionId: UUID?
+    @Published var qrPayload: QRPayload?
     
     private let api = APIService.shared
     
@@ -82,5 +83,28 @@ class TransactionViewModel: ObservableObject {
         
         isLoading = false
         return false
+    }
+    
+    func generateQR(type: QRPayload.PayloadType, forRequest: Bool = false) async {
+        guard amount > 0 else { return }
+        
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            // If it's a request, we need a destination (where the money goes)
+            let destId = selectedDestination?.id
+            let response = try await api.generateQR(type: type, amount: amount, destinationId: destId)
+            
+            if response.success {
+                self.qrPayload = response.data
+            } else {
+                errorMessage = response.message
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        
+        isLoading = false
     }
 }

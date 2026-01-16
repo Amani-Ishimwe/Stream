@@ -9,6 +9,9 @@ struct CardsView: View {
     @State private var isFlipped = false
     @State private var degrees: Double = 0
     @State private var showingScanner = false
+    @State private var activeQRPayload: QRPayload?
+    @State private var qrPayload: QRPayload?
+    @State private var showQRPayment = false
     
     var body: some View {
         ZStack {
@@ -69,10 +72,32 @@ struct CardsView: View {
             }
         }
         .fullScreenCover(isPresented: $showingScanner) {
-            QRScannerView()
+            QRScannerView { result in
+                handleScanResult(result)
+            }
+        }
+        .sheet(isPresented: $showQRPayment) {
+            if let payload = activeQRPayload {
+                QRPaymentFlow(payload: payload)
+            }
         }
         .onAppear {
-            Task { await viewModel.refreshData() }
+            Task { 
+                await viewModel.refreshData() 
+                await fetchSecureQR()
+            }
+        }
+    }
+
+    private func fetchSecureQR() async {
+        do {
+            // Default payment QR for the user's primary account
+            if let firstInst = viewModel.institutions.first {
+                let response = try await APIService.shared.generateQR(type: .send, amount: 0, destinationId: firstInst.id)
+                self.qrPayload = response.data
+            }
+        } catch {
+            print("Failed to fetch secure QR: \(error)")
         }
     }
     
@@ -145,12 +170,17 @@ struct CardsView: View {
                 .font(DesignSystem.Typography.caption)
                 .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
             
-            if let id = appState.currentUser?.id {
-                QRCodeView(data: "stream://user/\(id.uuidString)")
+            if let payload = qrPayload, 
+               let jsonData = try? JSONEncoder().encode(payload), 
+               let jsonString = String(data: jsonData, encoding: .utf8) {
+                QRCodeView(data: jsonString)
                     .frame(width: 140, height: 140)
                     .padding(12)
                     .background(Color.white)
                     .cornerRadius(12)
+            } else {
+                ProgressView()
+                    .frame(width: 140, height: 140)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -164,6 +194,20 @@ struct CardsView: View {
         )
     }
     
+    private func handleScanResult(_ result: String) {
+        if let data = result.data(using: .utf8) {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            if let payload = try? decoder.decode(QRPayload.self, from: data) {
+                // Add a small delay to allow the scanner to dismiss fully
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    self.activeQRPayload = payload
+                    self.showQRPayment = true
+                }
+            }
+        }
+    }
+
     func toggleFreeze(id: UUID) async {
         do {
             _ = try await APIService.shared.toggleFreeze(id: id)

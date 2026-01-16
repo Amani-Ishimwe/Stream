@@ -1,4 +1,5 @@
 import SwiftUI
+import Photos
 
 struct RequestMoneyFlow: View {
     var preSelectedDestination: Institution? = nil
@@ -81,7 +82,12 @@ struct RequestMoneyFlow: View {
             Spacer()
             
             Button("GENERATE PAYMENT LINK") {
-                withAnimation(.spring()) { qrCodeGenerated = true }
+                Task {
+                    await viewModel.generateQR(type: .request)
+                    if viewModel.qrPayload != nil {
+                        withAnimation(.spring()) { qrCodeGenerated = true }
+                    }
+                }
             }
             .buttonStyle(PrimaryButtonStyle(isEnabled: viewModel.amount > 0 && !viewModel.payer.isEmpty))
             .padding()
@@ -97,12 +103,19 @@ struct RequestMoneyFlow: View {
                     .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
                 
                 VStack(spacing: DesignSystem.Spacing.lg) {
-                    QRCodeView(data: "stream://request?amount=\(viewModel.amount)&payer=\(viewModel.payer)")
-                        .frame(width: 200, height: 200)
-                        .padding(DesignSystem.Spacing.lg)
-                        .background(Color.white)
-                        .cornerRadius(DesignSystem.Spacing.cornerRadiusCard)
-                        .shadow(color: DesignSystem.Colors.textPrimary(scheme).opacity(0.1), radius: 20)
+                    if let payload = viewModel.qrPayload,
+                       let jsonData = try? JSONEncoder().encode(payload),
+                       let jsonString = String(data: jsonData, encoding: .utf8) {
+                        QRCodeView(data: jsonString)
+                            .frame(width: 200, height: 200)
+                            .padding(DesignSystem.Spacing.lg)
+                            .background(Color.white)
+                            .cornerRadius(DesignSystem.Spacing.cornerRadiusCard)
+                            .shadow(color: DesignSystem.Colors.textPrimary(scheme).opacity(0.1), radius: 20)
+                    } else {
+                        ProgressView()
+                            .frame(width: 200, height: 200)
+                    }
                     
                     VStack(spacing: 4) {
                         Text("\(Int(viewModel.amount)) RWF")
@@ -118,11 +131,50 @@ struct RequestMoneyFlow: View {
             Spacer()
             
             Button("SAVE AS IMAGE") {
-                // Save logic
-                presentationMode.wrappedValue.dismiss()
+                saveQRToPhotos()
             }
             .buttonStyle(PrimaryButtonStyle())
             .padding()
+        }
+    }
+    
+    private func saveQRToPhotos() {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        
+        guard let payload = viewModel.qrPayload,
+              let jsonData = try? encoder.encode(payload),
+              let jsonString = String(data: jsonData, encoding: .utf8) else { return }
+        
+        let qrView = VStack(spacing: 16) {
+            Text("STREAM PAYMENT REQUEST")
+                .font(.headline)
+            QRCodeView(data: jsonString)
+                .frame(width: 200, height: 200)
+                .padding()
+                .background(Color.white)
+            Text("\(Int(viewModel.amount)) RWF")
+                .font(.title3)
+                .bold()
+            Text("From: \(viewModel.payer)")
+                .font(.subheadline)
+        }
+        .padding(40)
+        .background(Color.white)
+        
+        let renderer = ImageRenderer(content: qrView)
+        renderer.scale = UIScreen.main.scale
+        
+        if let uiImage = renderer.uiImage {
+            PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+                if status == .authorized || status == .limited {
+                    UIImageWriteToSavedPhotosAlbum(uiImage, nil, nil, nil)
+                    print("Request QR Saved to Photos")
+                    DispatchQueue.main.async {
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                }
+            }
         }
     }
 }

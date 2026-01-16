@@ -10,6 +10,8 @@ struct TransactionController: RouteCollection {
         transactions.post("send", use: sendMoney)
         transactions.post("topup", use: topUp)
         transactions.post("request", use: requestMoney)
+        transactions.post("qr", "generate", use: generateQR)
+        transactions.post("qr", "execute", use: executeQR)
     }
 
     // GET /transactions
@@ -41,6 +43,18 @@ struct TransactionController: RouteCollection {
         let destinationInstitutionId: UUID
         let amount: Double
         let payer: String
+    }
+
+    struct QRGenerateRequest: Content {
+        let type: QRPayload.PayloadType
+        let amount: Double
+        let sourceInstitutionId: UUID?
+        let destinationInstitutionId: UUID?
+    }
+
+    struct QRExecuteRequest: Content {
+        let payload: QRPayload
+        let pin: String?
     }
     
     // POST /transactions/send
@@ -101,6 +115,70 @@ struct TransactionController: RouteCollection {
         return StreamResponse(
             success: true,
             message: "Request sent successfully",
+            data: result.transaction,
+            updatedBalances: result.updatedBalances,
+            transactionId: result.transaction.id
+        )
+    }
+
+    // POST /transactions/qr/generate
+    @Sendable
+    func generateQR(req: Request) async throws -> StreamResponse<QRPayload> {
+        let input = try req.content.decode(QRGenerateRequest.self)
+        var payload = QRPayload(
+            type: input.type,
+            amount: input.amount,
+            sourceId: input.sourceInstitutionId,
+            destinationId: input.destinationInstitutionId
+        )
+        let secret = Environment.get("QR_SECRET") ?? "STREAM_QR_SECRET_2026"
+        payload.sign(secret: secret)
+        
+        // Log for debugging (so user can copy JSON and see a clickable link)
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        if let data = try? encoder.encode(payload), let jsonString = String(data: data, encoding: .utf8) {
+            print("\n--- QR CODE PAYLOAD ---")
+            print(jsonString)
+            
+            // Create clickable URL for testing
+            if let encodedJson = jsonString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+                let qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=\(encodedJson)"
+                print("\n--- QR CODE TEST LINK (Command+Click to open) ---")
+                print(qrUrl)
+            }
+            print("-----------------------\n")
+        }
+        
+        return StreamResponse(success: true, data: payload)
+    }
+
+    // POST /transactions/qr/execute
+    @Sendable
+    func executeQR(req: Request) async throws -> StreamResponse<Transaction> {
+        let user = try req.auth.require(User.self)
+        let input = try req.content.decode(QRExecuteRequest.self)
+        
+        let secret = Environment.get("QR_SECRET") ?? "STREAM_QR_SECRET_2026"
+        guard input.payload.verify(secret: secret) else {
+            throw Abort(.badRequest, reason: "Invalid or expired QR code")
+        }
+
+        // Mock PIN validation for now
+        if let pin = input.pin, pin != "1234" && pin != user.pin {
+             // In a real app, we'd check against hashed pin
+             // throw Abort(.unauthorized, reason: "Invalid Transaction PIN")
+        }
+
+        let result = try await transactionService.performQRTransaction(
+            user: user,
+            payload: input.payload,
+            on: req.db
+        )
+
+        return StreamResponse(
+            success: true,
+            message: "QR Transaction successful",
             data: result.transaction,
             updatedBalances: result.updatedBalances,
             transactionId: result.transaction.id

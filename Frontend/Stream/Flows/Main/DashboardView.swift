@@ -11,6 +11,8 @@ struct DashboardView: View {
     @State private var showTopUpFlow = false
     @State private var showScanner = false
     @State private var showLinkFlow = false
+    @State private var activeQRPayload: QRPayload?
+    @State private var showQRPayment = false
     
     var body: some View {
         ZStack {
@@ -39,8 +41,52 @@ struct DashboardView: View {
         .sheet(isPresented: $showSendFlow) { SendMoneyFlow() }
         .sheet(isPresented: $showRequestFlow) { RequestMoneyFlow() }
         .sheet(isPresented: $showTopUpFlow) { TopUpFlow() }
-        .fullScreenCover(isPresented: $showScanner) { QRScannerView() }
+        .fullScreenCover(isPresented: $showScanner) { 
+            QRScannerView { result in
+                handleScanResult(result)
+            } 
+        }
         .sheet(isPresented: $showLinkFlow) { LinkInstitutionFlow() }
+        .sheet(isPresented: $showQRPayment) {
+            if let payload = activeQRPayload {
+                QRPaymentFlow(payload: payload)
+            }
+        }
+    }
+    
+    private func handleScanResult(_ result: String) {
+        // Try decoding as QRPayload JSON
+        if let data = result.data(using: .utf8) {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601 // Or whatever format backend uses
+            if let payload = try? decoder.decode(QRPayload.self, from: data) {
+                print("Successfully decoded QR Payload: \(payload)")
+                
+                // Add a small delay to allow the scanner to dismiss fully
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    self.activeQRPayload = payload
+                    self.showQRPayment = true
+                }
+                return
+            } else {
+                print("Failed to decode QR payload from: \(result)")
+            }
+        }
+
+        // Fallback for legacy simple links
+        if result.starts(with: "stream://pay/") {
+            let idString = result.replacingOccurrences(of: "stream://pay/", with: "")
+            if let id = UUID(uuidString: idString) {
+                // Find institution and show send flow
+                if let inst = viewModel.institutions.first(where: { $0.id == id }) {
+                    // Logic would go here to pre-select, but for now we just show flow
+                    showSendFlow = true
+                } else {
+                    // Alert?
+                    showSendFlow = true 
+                }
+            }
+        }
     }
     
     // MARK: - Components

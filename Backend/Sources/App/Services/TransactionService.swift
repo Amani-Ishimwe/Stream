@@ -170,4 +170,40 @@ final class TransactionService: Sendable {
             )
         }
     }
+
+    // Dispatcher for QR-originated transactions
+    func performQRTransaction(user: User, payload: QRPayload, on db: Database) async throws -> TransactionResult {
+        switch payload.type {
+        case .send:
+            guard let sourceId = payload.sourceId else { throw Abort(.badRequest, reason: "Source ID missing for SEND") }
+            return try await performSend(
+                user: user,
+                sourceID: sourceId,
+                amount: payload.amount,
+                recipient: "QR Recipient", // In a real app, this might be encoded in the QR
+                metadata: ["source": "QR_SCAN"],
+                on: db
+            )
+        case .request:
+            guard let destId = payload.destinationId else { throw Abort(.badRequest, reason: "Destination ID missing for REQUEST") }
+            return try await performRequest(
+                user: user,
+                destinationID: destId,
+                amount: payload.amount,
+                payer: "QR Payer",
+                on: db
+            )
+        case .topup:
+            guard let sourceId = payload.sourceId, let destId = payload.destinationId else {
+                throw Abort(.badRequest, reason: "Source or Destination ID missing for TOPUP")
+            }
+            return try await performTopUp(
+                user: user,
+                sourceID: sourceId,
+                destinationID: destId,
+                amount: payload.amount,
+                on: db
+            )
+        }
+    }
 }

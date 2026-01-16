@@ -140,6 +140,10 @@ class APIService: ObservableObject {
         return try await request("/institutions/link", method: "POST", body: dto)
     }
     
+    func fetchInstitutionDetail(id: UUID) async throws -> StreamResponse<Institution> {
+        return try await request("/institutions/\(id.uuidString)")
+    }
+    
     func fetchInstitutionTransactions(id: UUID) async throws -> StreamResponse<[Transaction]> {
         return try await request("/institutions/\(id.uuidString)/transactions")
     }
@@ -172,6 +176,17 @@ class APIService: ObservableObject {
     func requestMoney(destinationId: UUID, amount: Double, payer: String) async throws -> StreamResponse<Transaction> {
         let dto = RequestMoneyDTO(destinationInstitutionId: destinationId, amount: amount, payer: payer)
         return try await request("/transactions/request", method: "POST", body: dto)
+    }
+
+    // MARK: - QR
+    func generateQR(type: QRPayload.PayloadType, amount: Double, sourceId: UUID? = nil, destinationId: UUID? = nil) async throws -> StreamResponse<QRPayload> {
+        let dto = QRGenerateDTO(type: type, amount: amount, sourceInstitutionId: sourceId, destinationInstitutionId: destinationId)
+        return try await request("/transactions/qr/generate", method: "POST", body: dto)
+    }
+
+    func executeQR(payload: QRPayload, pin: String? = nil) async throws -> StreamResponse<Transaction> {
+        let dto = QRExecuteDTO(payload: payload, pin: pin)
+        return try await request("/transactions/qr/execute", method: "POST", body: dto)
     }
 }
 

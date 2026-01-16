@@ -63,3 +63,32 @@ struct ChangePinDTO: Encodable {
     let oldPin: String
     let newPin: String
 }
+
+// MARK: - QR DTOs
+struct QRPayload: Codable {
+    enum PayloadType: String, Codable {
+        case send = "SEND"
+        case request = "REQUEST"
+        case topup = "TOPUP"
+    }
+
+    let type: PayloadType
+    let amount: Double
+    let sourceId: UUID?
+    let destinationId: UUID?
+    let transactionId: UUID?
+    let expiresAt: Date
+    let signature: String?
+}
+
+struct QRGenerateDTO: Encodable {
+    let type: QRPayload.PayloadType
+    let amount: Double
+    let sourceInstitutionId: UUID?
+    let destinationInstitutionId: UUID?
+}
+
+struct QRExecuteDTO: Encodable {
+    let payload: QRPayload
+    let pin: String?
+}

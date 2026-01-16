@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import PhotosUI
 
 struct QRScannerView: View {
     @Environment(\.presentationMode) var presentationMode
@@ -7,11 +8,16 @@ struct QRScannerView: View {
     @State private var isScanning = true
     @State private var scannedResult: String? {
         didSet {
-            if scannedResult != nil {
+            if let result = scannedResult {
+                onScan?(result)
                 presentationMode.wrappedValue.dismiss()
             }
         }
     }
+    @State private var showPhotoPicker = false
+    @State private var selectedItem: PhotosPickerItem?
+    
+    var onScan: ((String) -> Void)? = nil
     
     var body: some View {
         ZStack {
@@ -31,6 +37,20 @@ struct QRScannerView: View {
                 header
                 Spacer()
                 footer
+            }
+        }
+        .photosPicker(isPresented: $showPhotoPicker, selection: $selectedItem, matching: .images)
+        .onChange(of: selectedItem) { newItem in
+            Task {
+                if let data = try? await newItem?.loadTransferable(type: Data.self),
+                   let image = UIImage(data: data) {
+                    if let result = QRScannerUtils.detectQRCode(from: image) {
+                        scannedResult = result
+                    } else {
+                        // Handle no QR found (optional)
+                        print("No QR code found in selected image")
+                    }
+                }
             }
         }
     }
@@ -88,7 +108,7 @@ struct QRScannerView: View {
                 .foregroundColor(.white.opacity(0.8))
             
             HStack(spacing: 24) {
-                Button(action: { /* Upload from Gallery */ }) {
+                Button(action: { showPhotoPicker = true }) {
                     VStack {
                         Image(systemName: "photo.on.rectangle")
                             .font(.title2)
