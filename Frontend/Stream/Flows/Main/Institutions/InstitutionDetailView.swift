@@ -46,6 +46,7 @@ struct InstitutionDetailView: View {
                 }
             }
         }
+        .navigationBarBackButtonHidden(true)
         .onAppear {
             viewModel.institution = institution
             Task {

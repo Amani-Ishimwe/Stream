@@ -57,6 +57,7 @@ struct PINChangeView: View {
                 .disabled(!isFormValid)
             }
         }
+        .navigationBarBackButtonHidden(true)
     }
     
     private var header: some View {

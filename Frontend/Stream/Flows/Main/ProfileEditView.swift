@@ -54,6 +54,7 @@ struct ProfileEditView: View {
                 .padding()
             }
         }
+        .navigationBarBackButtonHidden(true)
         .onAppear {
             if let user = appState.currentUser {
                 name = user.name

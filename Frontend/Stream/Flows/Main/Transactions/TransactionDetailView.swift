@@ -28,6 +28,7 @@ struct TransactionDetailView: View {
                 }
             }
         }
+        .navigationBarBackButtonHidden(true)
     }
     
     private var header: some View {
