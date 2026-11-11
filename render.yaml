@@ -5,12 +5,10 @@ services:
     dockerfilePath: Backend/Dockerfile
     dockerContext: Backend
     plan: free
-    region: frankfurt # or oregon / ohio
+    region: frankfurt
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: stream-postgres
-          property: connectionString
+        sync: false # Set in Render Dashboard (Paste your existing Render DB or Neon/Supabase URL)
       - key: JWT_SECRET
         generateValue: true
       - key: QR_SECRET
@@ -21,11 +19,3 @@ services:
         sync: false # Set in Render Dashboard
       - key: SMTP_PASSWORD
         sync: false # Set in Render Dashboard
-
-databases:
-  - name: stream-postgres
-    plan: free
-    databaseName: stream_db
-    user: stream_user
-    region: frankfurt
-
