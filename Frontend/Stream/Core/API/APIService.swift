@@ -11,14 +11,56 @@ enum APIError: Error, LocalizedError {
     
     var errorDescription: String? {
         switch self {
-        case .invalidURL: return "Invalid URL"
-        case .httpError(let code): return "Server returned error: \(code)"
-        case .decodingError: return "Failed to process data from server"
-        case .unauthorized: return "Session expired. Please login again."
-        case .serverError(let reason): return reason
-        case .unknown(let error): return error.localizedDescription
+        case .invalidURL: 
+            return "Unable to connect. Please check your internet connection."
+        case .httpError(let code): 
+            if code == 400 { return "We could not process this request. Please check the details and try again." }
+            if code == 401 { return "Please sign in again to continue." }
+            if code == 404 { return "The requested information could not be found." }
+            if code == 409 { return "This account already exists. Please try signing in." }
+            if code >= 500 { return "Our server encountered a problem. Please try again shortly." }
+            return "Something went wrong (code \(code)). Please try again."
+        case .decodingError: 
+            return "Could not understand response from server. Please try again."
+        case .unauthorized: 
+            return "Your session expired. Please sign in again."
+        case .serverError(let reason): 
+            return Self.friendlyMessage(for: reason)
+        case .unknown: 
+            return "Unable to connect to the server. Please check your internet connection and try again."
         }
     }
+    
+    static func friendlyMessage(for reason: String) -> String {
+        let lower = reason.lowercased()
+        if lower.contains("invalid or expired qr") {
+            return "This QR code is expired or invalid. Please ask for a new QR code."
+        }
+        if lower.contains("invalid transaction pin") || lower.contains("pin") {
+            return "Incorrect transaction PIN. Please try again."
+        }
+        if lower.contains("insufficient") {
+            return "You don't have enough balance to complete this transaction."
+        }
+        if lower.contains("invalid email or password") || lower.contains("unauthorized") {
+            return "Incorrect email or password. Please try again or tap Forgot Password."
+        }
+        if lower.contains("email already exists") {
+            return "An account with this email already exists. Please sign in instead."
+        }
+        if lower.contains("verification code is incorrect") || lower.contains("code is invalid") {
+            return "The reset code is incorrect or expired. Please check your email or request a new one."
+        }
+        if lower.contains("not found") {
+            return "The selected account or details could not be found."
+        }
+        return reason
+    }
+}
+
+struct VaporErrorResponse: Decodable {
+    let error: Bool?
+    let reason: String?
 }
 
 struct StreamResponse<T: Decodable>: Decodable {
@@ -37,7 +79,7 @@ struct BalanceUpdate: Decodable {
 class APIService: ObservableObject {
     static let shared = APIService()
     
-    private let baseURL = "http://10.12.73.61:8080"
+    private let baseURL = "http://10.12.75.134:8080"
     
     // Auth Session (managed by AppState, but APIService needs it for headers)
     private var token: String? {
@@ -65,7 +107,9 @@ class APIService: ObservableObject {
             request.httpBody = try encoder.encode(body)
         }
         
+        print("DEBUG: [APIService] Sending \(method) request to \(url.absoluteString)")
         let (data, response) = try await URLSession.shared.data(for: request)
+        print("DEBUG: [APIService] Received response for \(path)")
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.unknown(NSError(domain: "Network", code: 0))
@@ -81,8 +125,15 @@ class APIService: ObservableObject {
         
         // Handle non-200 responses that might still have JSON error body
         if !(200...299).contains(httpResponse.statusCode) {
-            if let errorResponse = try? decoder.decode(StreamResponse<EmptyResponse>.self, from: data) {
-                throw APIError.serverError(errorResponse.message ?? "Unknown server error")
+            // First check Vapor error response format: {"error": true, "reason": "..."}
+            if let vaporError = try? decoder.decode(VaporErrorResponse.self, from: data),
+               let reason = vaporError.reason, !reason.isEmpty {
+                throw APIError.serverError(reason)
+            }
+            // Next check StreamResponse wrapper format: {"message": "..."}
+            if let errorResponse = try? decoder.decode(StreamResponse<EmptyResponse>.self, from: data),
+               let message = errorResponse.message, !message.isEmpty {
+                throw APIError.serverError(message)
             }
             throw APIError.httpError(httpResponse.statusCode)
         }
@@ -103,6 +154,16 @@ class APIService: ObservableObject {
     
     func signup(data: SignupRequest) async throws -> StreamResponse<SignupResponse> {
         return try await request("/auth/signup", method: "POST", body: data)
+    }
+    
+    func forgotPassword(email: String) async throws -> StreamResponse<EmptyResponse> {
+        let dto = ForgotPasswordDTO(email: email)
+        return try await request("/auth/forgot-password", method: "POST", body: dto)
+    }
+    
+    func resetPassword(email: String, code: String, newPassword: String) async throws -> StreamResponse<EmptyResponse> {
+        let dto = ResetPasswordDTO(email: email, code: code, newPassword: newPassword)
+        return try await request("/auth/reset-password", method: "POST", body: dto)
     }
     
     // MARK: - User

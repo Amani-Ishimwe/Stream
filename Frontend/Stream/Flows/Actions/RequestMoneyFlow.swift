@@ -48,7 +48,7 @@ struct RequestMoneyFlow: View {
                 .bold()
                 .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
             Spacer()
-            Text("REQUEST FUNDS")
+            Text("REQUEST MONEY")
                 .font(DesignSystem.Typography.headline)
                 .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
             Spacer()
@@ -74,11 +74,11 @@ struct RequestMoneyFlow: View {
                 }
                 
                 VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
-                    Text("PAYER IDENTIFIER")
+                    Text("PAYER (NAME OR PHONE)")
                         .font(DesignSystem.Typography.caption)
                         .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
                     
-                    TextField("NAME OR PHONE", text: $viewModel.payer)
+                    TextField("Enter name or phone", text: $viewModel.payer)
                         .font(DesignSystem.Typography.subheadline)
                         .padding()
                         .background(DesignSystem.Colors.surface(scheme))
@@ -89,7 +89,7 @@ struct RequestMoneyFlow: View {
             
             Spacer()
             
-            Button("GENERATE PAYMENT LINK") {
+            Button("Create Payment QR Code") {
                 Task {
                     await viewModel.generateQR(type: .request)
                     if viewModel.qrPayload != nil {
@@ -112,7 +112,7 @@ struct RequestMoneyFlow: View {
                 
                 VStack(spacing: DesignSystem.Spacing.lg) {
                     if let payload = viewModel.qrPayload,
-                       let jsonData = try? JSONEncoder().encode(payload),
+                       let jsonData = try? QRPayload.qrEncoder.encode(payload),
                        let jsonString = String(data: jsonData, encoding: .utf8) {
                         QRCodeView(data: jsonString)
                             .frame(width: 200, height: 200)

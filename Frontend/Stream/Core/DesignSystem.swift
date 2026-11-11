@@ -35,9 +35,14 @@ struct DesignSystem {
             scheme == .dark ? softBeige : deepBlue
         }
         
-        // Success/Error are handled by hierarchy and icons, using the same 2 colors
-        static func success(_ scheme: ColorScheme) -> Color { accent(scheme) }
-        static func error(_ scheme: ColorScheme) -> Color { accent(scheme) }
+        // Friendly, gentle error and success colors
+        static let errorRed = Color(red: 0.90, green: 0.28, blue: 0.28)
+        static let errorBg = Color(red: 0.95, green: 0.30, blue: 0.30).opacity(0.12)
+        static let successGreen = Color(red: 0.18, green: 0.72, blue: 0.45)
+        static let successBg = Color(red: 0.20, green: 0.75, blue: 0.45).opacity(0.12)
+        
+        static func success(_ scheme: ColorScheme) -> Color { successGreen }
+        static func error(_ scheme: ColorScheme) -> Color { errorRed }
     }
     
     // MARK: - Typography (High Density)
@@ -93,4 +98,65 @@ struct PrimaryButtonStyle: ButtonStyle {
 
 extension ButtonStyle where Self == PrimaryButtonStyle {
     static var primary: PrimaryButtonStyle { PrimaryButtonStyle() }
+}
+
+// MARK: - Friendly Feedback Banners
+struct FriendlyErrorBanner: View {
+    let message: String
+    @Environment(\.colorScheme) var scheme
+    
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: "exclamationmark.circle.fill")
+                .foregroundColor(DesignSystem.Colors.errorRed)
+                .font(.system(size: 16, weight: .semibold))
+            
+            Text(message)
+                .font(DesignSystem.Typography.footnote)
+                .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
+                .multilineTextAlignment(.leading)
+            
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(DesignSystem.Colors.errorBg)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(DesignSystem.Colors.errorRed.opacity(0.3), lineWidth: 1)
+                )
+        )
+    }
+}
+
+struct FriendlySuccessBanner: View {
+    let message: String
+    @Environment(\.colorScheme) var scheme
+    
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundColor(DesignSystem.Colors.successGreen)
+                .font(.system(size: 16, weight: .semibold))
+            
+            Text(message)
+                .font(DesignSystem.Typography.footnote)
+                .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
+                .multilineTextAlignment(.leading)
+            
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(DesignSystem.Colors.successBg)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(DesignSystem.Colors.successGreen.opacity(0.3), lineWidth: 1)
+                )
+        )
+    }
 }

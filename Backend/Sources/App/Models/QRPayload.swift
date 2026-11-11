@@ -23,7 +23,8 @@ public struct QRPayload: Content, Sendable {
         self.sourceId = sourceId
         self.destinationId = destinationId
         self.transactionId = transactionId
-        self.expiresAt = expiresAt
+        // Round to whole seconds so date serialization and integer timestamp are always identical
+        self.expiresAt = Date(timeIntervalSince1970: Double(Int(expiresAt.timeIntervalSince1970)))
     }
 
     // Signing logic using a secret key
@@ -43,7 +44,8 @@ public struct QRPayload: Content, Sendable {
         }
         
         let now = Date()
-        if expiresAt <= now {
+        // Allow a 60-second grace window to absorb slight clock drift between mobile devices and server
+        if expiresAt.addingTimeInterval(60) <= now {
             print("QR VERIFY: Expired. Expires: \(expiresAt), Now: \(now)")
             return false
         }

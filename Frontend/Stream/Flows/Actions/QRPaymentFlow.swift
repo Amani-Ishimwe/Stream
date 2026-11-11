@@ -33,10 +33,7 @@ struct QRPaymentFlow: View {
                         confirmButton
                         
                         if let error = errorMessage {
-                            Text(error)
-                                .font(DesignSystem.Typography.caption)
-                                .foregroundColor(.red)
-                                .multilineTextAlignment(.center)
+                            FriendlyErrorBanner(message: error)
                         }
                     }
                     .padding(24)
@@ -80,7 +77,7 @@ struct QRPaymentFlow: View {
     
     private var header: some View {
         VStack(spacing: 8) {
-            Text("CONFIRM TRANSACTION")
+            Text("CONFIRM PAYMENT")
                 .font(DesignSystem.Typography.headline)
                 .tracking(2)
                 .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
@@ -91,7 +88,7 @@ struct QRPaymentFlow: View {
                     .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
                     .padding(.top, 4)
             } else {
-                Text("VERIFY THE DETAILS BELOW")
+                Text("Please check the details below")
                     .font(DesignSystem.Typography.caption)
                     .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
             }
@@ -143,7 +140,7 @@ struct QRPaymentFlow: View {
     
     private var authSection: some View {
         VStack(spacing: 16) {
-            Text("ENTER TRANSACTION PIN")
+            Text("ENTER YOUR 4-DIGIT PIN")
                 .font(DesignSystem.Typography.caption).bold()
                 .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
             
@@ -165,7 +162,7 @@ struct QRPaymentFlow: View {
                 if isProcessing {
                     ProgressView().tint(.white)
                 } else {
-                    Text("AUTHORIZE & PAY")
+                    Text("Confirm & Pay")
                         .font(DesignSystem.Typography.callout).bold()
                 }
             }

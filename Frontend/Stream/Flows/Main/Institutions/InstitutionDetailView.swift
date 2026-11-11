@@ -53,7 +53,7 @@ struct InstitutionDetailView: View {
                 await viewModel.refreshAll()
             }
         }
-        .onChange(of: viewModel.institution) { newValue in
+        .onChange(of: viewModel.institution) { _, newValue in
             if let newValue = newValue {
                 self.institution = newValue
             }
@@ -132,7 +132,7 @@ struct InstitutionDetailView: View {
     private var limitsSection: some View {
         VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
             HStack {
-                Text("INSTITUTIONAL LIMITS")
+                Text("ACCOUNT SPENDING LIMITS")
                     .font(DesignSystem.Typography.caption)
                     .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
                 Spacer()
@@ -148,8 +148,8 @@ struct InstitutionDetailView: View {
             }
             
             VStack(spacing: 1) {
-                LimitRow(label: "DAILY SPENDING", value: "\(Int(institution.dailyLimit ?? 0)) RWF")
-                LimitRow(label: "MONTHLY VOLUME", value: "\(Int(institution.monthlyLimit ?? 0)) RWF")
+                LimitRow(label: "DAILY LIMIT", value: "\(Int(institution.dailyLimit ?? 0)) RWF")
+                LimitRow(label: "MONTHLY LIMIT", value: "\(Int(institution.monthlyLimit ?? 0)) RWF")
             }
             .background(DesignSystem.Colors.surface(scheme))
             .cornerRadius(DesignSystem.Spacing.cornerRadiusCard)
@@ -196,7 +196,7 @@ struct InstitutionDetailView: View {
                 .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
             
             VStack {
-                if let payload = viewModel.qrPayload, let jsonData = try? JSONEncoder().encode(payload), let jsonString = String(data: jsonData, encoding: .utf8) {
+                if let payload = viewModel.qrPayload, let jsonData = try? QRPayload.qrEncoder.encode(payload), let jsonString = String(data: jsonData, encoding: .utf8) {
                     QRCodeView(data: jsonString)
                         .frame(width: 140, height: 140)
                         .padding(12)
@@ -388,15 +388,15 @@ struct LimitEditView: View {
     
     var body: some View {
         VStack(spacing: 24) {
-            Text("MANAGE INSTRUMENT LIMITS")
+            Text("SET SPENDING LIMITS")
                 .font(DesignSystem.Typography.headline)
                 .tracking(2)
             
             VStack(alignment: .leading, spacing: 8) {
-                Text("DAILY SPENDING LIMIT (RWF)")
+                Text("DAILY LIMIT (RWF)")
                     .font(DesignSystem.Typography.caption)
                     .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
-                TextField("", text: $daily)
+                TextField("Daily limit", text: $daily)
                     .keyboardType(.numberPad)
                     .padding()
                     .background(DesignSystem.Colors.surface(scheme))
@@ -404,17 +404,17 @@ struct LimitEditView: View {
             }
             
             VStack(alignment: .leading, spacing: 8) {
-                Text("MONTHLY VOLUME LIMIT (RWF)")
+                Text("MONTHLY LIMIT (RWF)")
                     .font(DesignSystem.Typography.caption)
                     .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
-                TextField("", text: $monthly)
+                TextField("Monthly limit", text: $monthly)
                     .keyboardType(.numberPad)
                     .padding()
                     .background(DesignSystem.Colors.surface(scheme))
                     .cornerRadius(12)
             }
             
-            Button("UPDATE LIMITS", action: onSave)
+            Button("Save Limits", action: onSave)
                 .buttonStyle(PrimaryButtonStyle())
             
             Spacer()

@@ -64,6 +64,17 @@ struct ChangePinDTO: Encodable {
     let newPin: String
 }
 
+// MARK: - Auth DTOs
+struct ForgotPasswordDTO: Encodable {
+    let email: String
+}
+
+struct ResetPasswordDTO: Encodable {
+    let email: String
+    let code: String
+    let newPassword: String
+}
+
 // MARK: - QR DTOs
 struct QRPayload: Codable, Identifiable {
     var id: String { signature ?? UUID().uuidString }
@@ -81,6 +92,13 @@ struct QRPayload: Codable, Identifiable {
     let transactionId: UUID?
     let expiresAt: Date
     let signature: String?
+    
+    static var qrEncoder: JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        return encoder
+    }
 }
 
 struct QRGenerateDTO: Encodable {

@@ -15,6 +15,7 @@ struct TransactionController: RouteCollection {
     }
 
     // GET /transactions
+    @available(macOS 10.15, iOS 13.0, *)
     @Sendable
     func index(req: Request) async throws -> StreamResponse<[Transaction]> {
         let user = try req.auth.require(User.self)
@@ -59,6 +60,7 @@ struct TransactionController: RouteCollection {
     }
     
     // POST /transactions/send
+    @available(macOS 10.15, iOS 13.0, *)
     @Sendable
     func sendMoney(req: Request) async throws -> StreamResponse<Transaction> {
         let user = try req.auth.require(User.self)
@@ -81,6 +83,7 @@ struct TransactionController: RouteCollection {
     }
     
     // POST /transactions/topup
+    @available(macOS 10.15, iOS 13.0, *)
     @Sendable
     func topUp(req: Request) async throws -> StreamResponse<Transaction> {
         let user = try req.auth.require(User.self)
@@ -102,6 +105,7 @@ struct TransactionController: RouteCollection {
     }
     
     // POST /transactions/request
+    @available(macOS 10.15, iOS 13.0, *)
     @Sendable
     func requestMoney(req: Request) async throws -> StreamResponse<Transaction> {
         let user = try req.auth.require(User.self)
@@ -123,6 +127,7 @@ struct TransactionController: RouteCollection {
     }
 
     // POST /transactions/qr/generate
+    @available(macOS 10.15, iOS 13.0, *)
     @Sendable
     func generateQR(req: Request) async throws -> StreamResponse<QRPayload> {
         let input = try req.content.decode(QRGenerateRequest.self)
@@ -155,6 +160,7 @@ struct TransactionController: RouteCollection {
     }
 
     // POST /transactions/qr/execute
+    @available(macOS 10.15, iOS 13.0, *)
     @Sendable
     func executeQR(req: Request) async throws -> StreamResponse<Transaction> {
         let user = try req.auth.require(User.self)

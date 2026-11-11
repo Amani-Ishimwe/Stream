@@ -10,9 +10,11 @@ struct AuthController: RouteCollection, Sendable {
         auth.post("signup", use: signup)
         auth.post("login", use: login) // No longer grouped by User.authenticator()
         auth.post("forgot-password", use: forgotPassword)
+        auth.post("reset-password", use: resetPassword)
     }
 
     // MARK: - Signup
+    @available(macOS 10.15, iOS 13.0, *)
     @Sendable func signup(req: Request) async throws -> StreamResponse<SignupResponse> {
         try SignupRequest.validate(content: req)
         let input = try req.content.decode(SignupRequest.self)
@@ -38,12 +40,16 @@ struct AuthController: RouteCollection, Sendable {
         )
         
         try await user.save(on: req.db)
+        EmailService.shared.sendWelcomeEmail(to: user.email, name: user.name)
         return StreamResponse(success: true, message: "Account created successfully!", data: SignupResponse(message: "Success"))
     }
 
     // MARK: - Login
+    @available(macOS 10.15, iOS 13.0, *)
     @Sendable func login(req: Request) async throws -> StreamResponse<LoginResponse> {
+        print("DEBUG: [AuthController] login request received")
         let loginRequest = try req.content.decode(LoginRequest.self)
+        print("DEBUG: [AuthController] login attempt for user: \(loginRequest.email)")
         
         guard let user = try await User.query(on: req.db)
             .filter(\.$email == loginRequest.email)
@@ -68,10 +74,79 @@ struct AuthController: RouteCollection, Sendable {
     }
 
     // MARK: - Forgot Password
+    @available(macOS 10.15, iOS 13.0, *)
     @Sendable func forgotPassword(req: Request) async throws -> StreamResponse<ForgotPasswordResponse> {
         let input = try req.content.decode(ForgotPasswordRequest.self)
-        return StreamResponse(success: true, message: "If an account exists for \(input.email), you will receive a reset link shortly.", data: ForgotPasswordResponse(message: "Sent"))
+        let cleanEmail = input.email.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        if let user = try await User.query(on: req.db)
+            .filter(\.$email == cleanEmail)
+            .first() {
+            let code = await PasswordResetManager.shared.createResetCode(for: cleanEmail)
+            EmailService.shared.sendPasswordResetEmail(to: cleanEmail, code: code, name: user.name)
+        }
+        
+        return StreamResponse(
+            success: true, 
+            message: "If an account exists for \(input.email), a 6-digit password reset code has been sent to your email.", 
+            data: ForgotPasswordResponse(message: "Sent")
+        )
     }
+
+    // MARK: - Reset Password
+    @available(macOS 10.15, iOS 13.0, *)
+    @Sendable func resetPassword(req: Request) async throws -> StreamResponse<ResetPasswordResponse> {
+        let input = try req.content.decode(ResetPasswordRequest.self)
+        let cleanEmail = input.email.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        guard await PasswordResetManager.shared.verifyResetCode(code: input.code, for: cleanEmail) else {
+            throw Abort(.badRequest, reason: "The verification code is incorrect or has expired. Please check your email or request a new code.")
+        }
+        
+        guard let user = try await User.query(on: req.db)
+            .filter(\.$email == cleanEmail)
+            .first() else {
+            throw Abort(.notFound, reason: "Account not found.")
+        }
+        
+        let hashedPassword = try Bcrypt.hash(input.newPassword)
+        user.passwordHash = hashedPassword
+        try await user.save(on: req.db)
+        await PasswordResetManager.shared.clearCode(for: cleanEmail)
+        
+        EmailService.shared.sendEmail(
+            to: cleanEmail,
+            subject: "Your Stream Password Has Been Reset",
+            body: """
+            Hello \(user.name),
+
+            Your Stream Mobile Banking password was successfully reset. You can now log in using your new password.
+
+            If you did not make this change, please contact support immediately.
+
+            Best regards,
+            The Stream Banking Team
+            """
+        )
+        
+        return StreamResponse(
+            success: true, 
+            message: "Your password has been reset successfully. You can now sign in.", 
+            data: ResetPasswordResponse(message: "Success")
+        )
+    }
+}
+
+// MARK: - Data Transfer Objects (DTOs)
+
+struct ResetPasswordRequest: Content {
+    let email: String
+    let code: String
+    let newPassword: String
+}
+
+struct ResetPasswordResponse: Content {
+    let message: String
 }
 
 // MARK: - Data Transfer Objects (DTOs)

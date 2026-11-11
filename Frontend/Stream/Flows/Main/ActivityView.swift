@@ -34,7 +34,7 @@ struct ActivityView: View {
     
     private var headerSection: some View {
         HStack {
-            Text("ACTIVITY LEDGER")
+            Text("ACTIVITY")
                 .font(DesignSystem.Typography.title)
                 .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
             Spacer()

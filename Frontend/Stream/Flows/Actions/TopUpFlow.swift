@@ -52,7 +52,7 @@ struct TopUpFlow: View {
                     .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
             }
             Spacer()
-            Text("CAPITAL INFUSION")
+            Text("ADD MONEY")
                 .font(DesignSystem.Typography.headline)
                 .tracking(2)
                 .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
@@ -76,7 +76,7 @@ struct TopUpSourceStep: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: DesignSystem.Spacing.lg) {
-            Text("SELECT SOURCE ASSET")
+            Text("CHOOSE ACCOUNT TO TRANSFER FROM")
                 .font(DesignSystem.Typography.caption)
                 .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
                 .padding(.horizontal, DesignSystem.Spacing.lg)
@@ -148,7 +148,7 @@ struct TopUpAmountStep: View {
                         .multilineTextAlignment(.center)
                         .keyboardType(.numberPad)
                         .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
-                        .onChange(of: input) { viewModel.amount = Double($0) ?? 0 }
+                        .onChange(of: input) { _, newValue in viewModel.amount = Double(newValue) ?? 0 }
                 }
             }
             .padding(.top, 40)
@@ -250,13 +250,13 @@ struct TopUpConfirmStep: View {
         VStack(spacing: 20) {
             Image(systemName: "checkmark.shield.fill")
                 .font(.system(size: 80))
-                .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
+                .foregroundColor(DesignSystem.Colors.successGreen)
             
-            Text("INFUSION COMPLETE")
+            Text("MONEY ADDED")
                 .font(DesignSystem.Typography.title)
                 .bold()
             
-            Text("Asset successfully transferred to your main account.")
+            Text("Funds were successfully added to your account.")
                 .font(DesignSystem.Typography.body)
                 .multilineTextAlignment(.center)
                 .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
@@ -271,13 +271,13 @@ struct TopUpConfirmStep: View {
         VStack(spacing: 20) {
             Image(systemName: "exclamationmark.octagon.fill")
                 .font(.system(size: 80))
-                .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
+                .foregroundColor(DesignSystem.Colors.errorRed)
             
-            Text("INFUSION FAILED")
+            Text("COULD NOT ADD MONEY")
                 .font(DesignSystem.Typography.title)
                 .bold()
             
-            Text(viewModel.errorMessage ?? "We could not process this capital infusion. Please check your source balance.")
+            Text(viewModel.errorMessage ?? "We could not add money. Please check your account balance and try again.")
                 .font(DesignSystem.Typography.body)
                 .multilineTextAlignment(.center)
                 .foregroundColor(DesignSystem.Colors.textSecondary(scheme))

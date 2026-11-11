@@ -35,7 +35,7 @@ struct QRScannerView: View {
             }
         }
         .photosPicker(isPresented: $showPhotoPicker, selection: $selectedItem, matching: .images)
-        .onChange(of: selectedItem) { newItem in
+        .onChange(of: selectedItem) { _, newItem in
             Task {
                 do {
                     print("DEBUG: Processing selected gallery item...")
@@ -61,7 +61,7 @@ struct QRScannerView: View {
                 }
             }
         }
-        .onChange(of: scannedResult) { newValue in
+        .onChange(of: scannedResult) { _, newValue in
             if let result = newValue {
                 print("DEBUG: scannedResult changed, notifying parent: \(result)")
                 onScan?(result)

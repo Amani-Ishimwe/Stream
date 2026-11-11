@@ -9,11 +9,11 @@ enum StreamTab: String, CaseIterable {
     
     var title: String {
         switch self {
-        case .home: return "HOUSE"
-        case .activity: return "LEDGER"
-        case .send: return "FLOW"
-        case .cards: return "VAULT"
-        case .settings: return "CONFIG"
+        case .home: return "HOME"
+        case .activity: return "ACTIVITY"
+        case .send: return "SEND"
+        case .cards: return "CARDS"
+        case .settings: return "SETTINGS"
         }
     }
 }

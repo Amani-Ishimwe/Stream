@@ -4,6 +4,8 @@ struct LoginView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = AuthViewModel()
     @State private var isSignup = false
+    @State private var showPassword = false
+    @State private var showForgotPassword = false
     @Environment(\.colorScheme) var scheme
     
     var body: some View {
@@ -24,7 +26,7 @@ struct LoginView: View {
                             .tracking(8)
                             .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
                         
-                        Text("PREMIUM MOBILE BANKING")
+                        Text("SIMPLE & SECURE BANKING")
                             .font(DesignSystem.Typography.caption)
                             .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
                     }
@@ -35,7 +37,7 @@ struct LoginView: View {
                         Text("EMAIL")
                             .font(DesignSystem.Typography.caption)
                             .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
-                        TextField("", text: $viewModel.email)
+                        TextField("Enter your email", text: $viewModel.email)
                             .textFieldStyle(StreamTextFieldStyle())
                             .autocapitalization(.none)
                             .keyboardType(.emailAddress)
@@ -45,18 +47,40 @@ struct LoginView: View {
                         Text("PASSWORD")
                             .font(DesignSystem.Typography.caption)
                             .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
-                        SecureField("", text: $viewModel.password)
-                            .textFieldStyle(StreamTextFieldStyle())
+                        
+                        HStack {
+                            if showPassword {
+                                TextField("Enter your password", text: $viewModel.password)
+                            } else {
+                                SecureField("Enter your password", text: $viewModel.password)
+                            }
+                            
+                            Button(action: { showPassword.toggle() }) {
+                                Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
+                                    .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
+                                    .padding(.trailing, 4)
+                            }
+                        }
+                        .padding()
+                        .background(DesignSystem.Colors.surface(scheme))
+                        .cornerRadius(DesignSystem.Spacing.cornerRadiusCard)
+                        .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
+                        .font(DesignSystem.Typography.callout)
                     }
                     
+                    HStack {
+                        Spacer()
+                        Button(action: { showForgotPassword = true }) {
+                            Text("Forgot password?")
+                                .font(DesignSystem.Typography.footnote)
+                                .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
+                        }
+                    }
+                    .padding(.top, 2)
+                    
                     if let error = viewModel.errorMessage {
-                        Text(error.uppercased())
-                            .font(DesignSystem.Typography.caption)
-                            .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
-                            .padding(.vertical, 4)
-                            .frame(maxWidth: .infinity)
-                            .background(DesignSystem.Colors.surface(scheme))
-                            .cornerRadius(4)
+                        FriendlyErrorBanner(message: error)
+                            .padding(.top, 4)
                     }
                 }
                 .padding(.horizontal, DesignSystem.Spacing.lg)
@@ -72,7 +96,7 @@ struct LoginView: View {
                                 ProgressView()
                                     .progressViewStyle(CircularProgressViewStyle(tint: DesignSystem.Colors.background(scheme)))
                             } else {
-                                Text("AUTHORIZE ACCESS")
+                                Text("Sign In")
                                     .bold()
                             }
                         }
@@ -86,7 +110,7 @@ struct LoginView: View {
                     .disabled(viewModel.isLoading)
                     
                     Button(action: { isSignup = true }) {
-                        Text("CREATE NEW ACCOUNT")
+                        Text("CREATE AN ACCOUNT")
                             .font(DesignSystem.Typography.footnote)
                             .bold()
                             .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
@@ -98,6 +122,9 @@ struct LoginView: View {
         }
         .fullScreenCover(isPresented: $isSignup) {
             SignupView()
+        }
+        .sheet(isPresented: $showForgotPassword) {
+            ForgotPasswordView()
         }
     }
 }

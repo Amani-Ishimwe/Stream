@@ -56,7 +56,7 @@ struct SendMoneyFlow: View {
                     .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
             }
             Spacer()
-            Text("SEND FUNDS")
+            Text("SEND MONEY")
                 .font(DesignSystem.Typography.headline)
                 .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
             Spacer()
@@ -274,7 +274,7 @@ struct AmountStep: View {
                         .keyboardType(.decimalPad)
                         .multilineTextAlignment(.center)
                         .fixedSize()
-                        .onChange(of: amountStr) { val in
+                        .onChange(of: amountStr) { _, val in
                             amount = Double(val) ?? 0
                         }
                     
@@ -340,7 +340,7 @@ struct ConfirmStep: View {
                     
                     VStack(spacing: 1) {
                         ConfirmRow(label: "RECIPIENT", value: viewModel.recipient.uppercased())
-                        ConfirmRow(label: "FUNDING SOURCE", value: viewModel.selectedSource?.name.uppercased() ?? "")
+                        ConfirmRow(label: "PAY FROM", value: viewModel.selectedSource?.name.uppercased() ?? "")
                         ConfirmRow(label: "AMOUNT", value: "\(Int(viewModel.amount)) RWF")
                         ConfirmRow(label: "FEE", value: "0 RWF")
                     }
@@ -350,12 +350,8 @@ struct ConfirmStep: View {
                 }
                 
                 if let error = viewModel.errorMessage {
-                    Text(error)
-                        .font(DesignSystem.Typography.caption)
-                        .foregroundColor(.red)
-                        .padding()
-                        .background(Color.red.opacity(0.1))
-                        .cornerRadius(8)
+                    FriendlyErrorBanner(message: error)
+                        .padding(.horizontal, DesignSystem.Spacing.lg)
                 }
                 
                 Spacer()
@@ -370,7 +366,8 @@ struct ConfirmStep: View {
                     if viewModel.isLoading {
                         ProgressView().tint(DesignSystem.Colors.background(scheme))
                     } else {
-                        Text("AUTHORIZE PAYMENT")
+                        Text("Send Now")
+                            .bold()
                     }
                 }
                 .buttonStyle(PrimaryButtonStyle())

@@ -19,6 +19,7 @@ struct InstitutionController: RouteCollection {
     }
 
     // POST /institutions/:id/limits
+    @available(macOS 10.15, iOS 13.0, *)
     @Sendable
     func updateLimits(req: Request) async throws -> StreamResponse<InstitutionDTO> {
         let user = try req.auth.require(User.self)
@@ -42,6 +43,7 @@ struct InstitutionController: RouteCollection {
     }
     
     // GET /institutions/available
+    @available(macOS 10.15, iOS 13.0, *)
     @Sendable
     func getAvailable(req: Request) async throws -> StreamResponse<[Institution]> {
         let all = try await Institution.query(on: req.db).filter(\.$isActive == true).all()
@@ -54,6 +56,7 @@ struct InstitutionController: RouteCollection {
     }
 
     // POST /institutions/link
+    @available(macOS 10.15, iOS 13.0, *)
     @Sendable
     func linkInstitution(req: Request) async throws -> StreamResponse<InstitutionDTO> {
         let user = try req.auth.require(User.self)
@@ -97,6 +100,7 @@ struct InstitutionController: RouteCollection {
     }
     
     // POST /institutions/:id/freeze
+    @available(macOS 10.15, iOS 13.0, *)
     @Sendable
     func toggleFreeze(req: Request) async throws -> StreamResponse<InstitutionDTO> {
         let user = try req.auth.require(User.self)
@@ -153,6 +157,7 @@ struct InstitutionController: RouteCollection {
     }
     
     // GET /institutions
+    @available(macOS 10.15, iOS 13.0, *)
     @Sendable
     func index(req: Request) async throws -> StreamResponse<[InstitutionDTO]> {
         let user = try req.auth.require(User.self)
@@ -168,6 +173,7 @@ struct InstitutionController: RouteCollection {
     }
 
     // GET /institutions/:id
+    @available(macOS 10.15, iOS 13.0, *)
     @Sendable
     func getDetail(req: Request) async throws -> StreamResponse<InstitutionDTO> {
         let user = try req.auth.require(User.self)
@@ -186,6 +192,7 @@ struct InstitutionController: RouteCollection {
     }
 
     // GET /institutions/:id/transactions
+    @available(macOS 10.15, iOS 13.0, *)
     @Sendable
     func getTransactions(req: Request) async throws -> StreamResponse<[Transaction]> {
         let user = try req.auth.require(User.self)

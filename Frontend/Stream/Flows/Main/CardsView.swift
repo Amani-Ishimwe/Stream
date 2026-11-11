@@ -11,6 +11,10 @@ struct CardsView: View {
     @State private var showingScanner = false
     @State private var activeQRPayload: QRPayload?
     @State private var qrPayload: QRPayload?
+    @State private var showLimitEdit = false
+    @State private var showRequestFlow = false
+    @State private var dailyLimit: String = ""
+    @State private var monthlyLimit: String = ""
     
     var body: some View {
         ZStack {
@@ -61,8 +65,16 @@ struct CardsView: View {
                     }
                     
                     HStack(spacing: DesignSystem.Spacing.md) {
-                        CardActionBtn(title: "LIMITS", icon: "slider.horizontal.3", isActive: true) { }
-                        CardActionBtn(title: "REQUEST", icon: "arrow.down.to.line.compact", isActive: true) { }
+                        CardActionBtn(title: "LIMITS", icon: "slider.horizontal.3", isActive: true) {
+                            if let first = viewModel.institutions.first {
+                                dailyLimit = "\(Int(first.dailyLimit ?? 1000000))"
+                                monthlyLimit = "\(Int(first.monthlyLimit ?? 5000000))"
+                                showLimitEdit = true
+                            }
+                        }
+                        CardActionBtn(title: "REQUEST", icon: "arrow.down.to.line.compact", isActive: true) {
+                            showRequestFlow = true
+                        }
                     }
                 }
                 .padding(.horizontal, DesignSystem.Spacing.lg)
@@ -78,10 +90,26 @@ struct CardsView: View {
         .sheet(item: $activeQRPayload) { payload in
             QRPaymentFlow(payload: payload)
         }
-        .alert("QR ERROR", isPresented: $showDecodeError) {
+        .sheet(isPresented: $showRequestFlow) {
+            RequestMoneyFlow()
+        }
+        .sheet(isPresented: $showLimitEdit) {
+            if let first = viewModel.institutions.first {
+                LimitEditView(daily: $dailyLimit, monthly: $monthlyLimit) {
+                    Task {
+                        let d = Double(dailyLimit) ?? (first.dailyLimit ?? 1000000)
+                        let m = Double(monthlyLimit) ?? (first.monthlyLimit ?? 5000000)
+                        _ = try? await APIService.shared.updateLimits(id: first.id, daily: d, monthly: m)
+                        await viewModel.refreshData()
+                        showLimitEdit = false
+                    }
+                }
+            }
+        }
+        .alert("Invalid QR Code", isPresented: $showDecodeError) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text(decodeErrorMessage ?? "Unknown decoding error")
+            Text(decodeErrorMessage ?? "We could not read this QR code. Please scan a valid Stream payment QR code.")
         }
         .onAppear {
             Task { 
@@ -105,7 +133,7 @@ struct CardsView: View {
     
     private var headerSection: some View {
         HStack {
-            Text("SMART CARD")
+            Text("MY CARD")
                 .font(DesignSystem.Typography.title)
                 .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
             Spacer()
@@ -168,12 +196,12 @@ struct CardsView: View {
     
     private var cardBack: some View {
         VStack(spacing: DesignSystem.Spacing.md) {
-            Text("SECURE PAYMENT QR")
+            Text("PAYMENT QR CODE")
                 .font(DesignSystem.Typography.caption)
                 .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
             
             if let payload = qrPayload, 
-               let jsonData = try? JSONEncoder().encode(payload), 
+               let jsonData = try? QRPayload.qrEncoder.encode(payload), 
                let jsonString = String(data: jsonData, encoding: .utf8) {
                 QRCodeView(data: jsonString)
                     .frame(width: 140, height: 140)
@@ -211,10 +239,12 @@ struct CardsView: View {
         guard let data = cleanJson.data(using: .utf8) else { return }
 
         let strategies: [(JSONDecoder.DateDecodingStrategy, JSONDecoder.KeyDecodingStrategy)] = [
-            (.iso8601, .useDefaultKeys),
-            (.secondsSince1970, .useDefaultKeys),
             (.iso8601, .convertFromSnakeCase),
-            (.secondsSince1970, .convertFromSnakeCase)
+            (.iso8601, .useDefaultKeys),
+            (.deferredToDate, .useDefaultKeys),
+            (.deferredToDate, .convertFromSnakeCase),
+            (.secondsSince1970, .convertFromSnakeCase),
+            (.secondsSince1970, .useDefaultKeys)
         ]
 
         for (dateStr, keyStr) in strategies {
@@ -227,7 +257,7 @@ struct CardsView: View {
             }
         }
         
-        self.decodeErrorMessage = "INCORRECT FORMAT\n\nData: \(cleanJson.prefix(60))..."
+        self.decodeErrorMessage = "We could not read this QR code. Please scan a valid Stream payment QR code."
         self.showDecodeError = true
     }
 

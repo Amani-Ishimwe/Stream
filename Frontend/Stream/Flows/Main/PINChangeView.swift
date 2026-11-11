@@ -26,12 +26,7 @@ struct PINChangeView: View {
                     .padding(.horizontal, DesignSystem.Spacing.lg)
                     
                     if let error = errorMessage {
-                        Text(error)
-                            .font(DesignSystem.Typography.caption)
-                            .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
-                            .padding()
-                            .background(DesignSystem.Colors.surface(scheme))
-                            .cornerRadius(8)
+                        FriendlyErrorBanner(message: error)
                             .padding(.horizontal, DesignSystem.Spacing.lg)
                     }
                     

@@ -15,6 +15,7 @@ struct NotificationController: RouteCollection, Sendable {
     }
     
     // Helper to get user from token
+    @available(macOS 10.15, iOS 13.0, *)
     private func getUser(req: Request) async throws -> User {
         let payload = try req.auth.require(UserPayload.self)
         
@@ -24,6 +25,7 @@ struct NotificationController: RouteCollection, Sendable {
         return user
     }
     
+    @available(macOS 10.15, iOS 13.0, *)
     @Sendable func getNotifications(req: Request) async throws -> StreamResponse<[Notification]> {
         let user = try await getUser(req: req)
         
@@ -34,6 +36,7 @@ struct NotificationController: RouteCollection, Sendable {
         return StreamResponse(success: true, data: notifications)
     }
     
+    @available(macOS 10.15, iOS 13.0, *)
     @Sendable func markAsRead(req: Request) async throws -> StreamResponse<EmptyResponse> {
         let user = try await getUser(req: req)
         

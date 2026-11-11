@@ -73,10 +73,12 @@ struct DashboardView: View {
 
         // Try multiple decoding strategies to handle backend/frontend discrepancies
         let strategies: [(JSONDecoder.DateDecodingStrategy, JSONDecoder.KeyDecodingStrategy)] = [
-            (.iso8601, .useDefaultKeys),
-            (.secondsSince1970, .useDefaultKeys),
             (.iso8601, .convertFromSnakeCase),
-            (.secondsSince1970, .convertFromSnakeCase)
+            (.iso8601, .useDefaultKeys),
+            (.deferredToDate, .useDefaultKeys),
+            (.deferredToDate, .convertFromSnakeCase),
+            (.secondsSince1970, .convertFromSnakeCase),
+            (.secondsSince1970, .useDefaultKeys)
         ]
 
         for (dateStr, keyStr) in strategies {
@@ -98,8 +100,8 @@ struct DashboardView: View {
             }
         }
 
-        // Detailed error for the user
-        self.decodeErrorMessage = "INCORRECT FORMAT\n\nData received: \(cleanJson.prefix(60))..."
+        // Friendly error for the user
+        self.decodeErrorMessage = "We could not read this QR code. Please scan a valid Stream payment QR code."
         self.showDecodeError = true
     }
 
@@ -151,7 +153,7 @@ struct DashboardView: View {
     private var balanceSection: some View {
         VStack(spacing: DesignSystem.Spacing.md) {
             VStack(spacing: 4) {
-                Text("TOTAL NET WORTH")
+                Text("TOTAL BALANCE")
                     .font(DesignSystem.Typography.caption)
                     .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
                 

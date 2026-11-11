@@ -101,6 +101,6 @@ struct SeedData {
             }
         }
         
-        print("✅ Database seeded successfully with Stream (Rwanda) data!")
+        print("Database seeded successfully with Stream (Rwanda) data!")
     }
 }

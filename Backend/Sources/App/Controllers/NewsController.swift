@@ -7,6 +7,7 @@ struct NewsController: RouteCollection, Sendable {
         news.get(use: getNews)
     }
 
+    @available(macOS 10.15, iOS 13.0, *)
     @Sendable func getNews(req: Request) async throws -> StreamResponse<[NewsArticle]> {
         let articles = try await NewsArticle.query(on: req.db)
             .sort(\.$publishedAt, .descending)

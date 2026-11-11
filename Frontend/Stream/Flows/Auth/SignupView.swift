@@ -3,6 +3,7 @@ import SwiftUI
 struct SignupView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = AuthViewModel()
+    @State private var showPassword = false
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var scheme
     
@@ -18,12 +19,12 @@ struct SignupView: View {
                         .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
                     
                     VStack(spacing: 4) {
-                        Text("ENROLLMENT")
+                        Text("CREATE ACCOUNT")
                             .font(DesignSystem.Typography.title)
                             .tracking(4)
                             .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
                         
-                        Text("ESTABLISH YOUR PREMIUM CREDENTIALS")
+                        Text("Enter your details to get started")
                             .font(DesignSystem.Typography.caption)
                             .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
                     }
@@ -34,12 +35,12 @@ struct SignupView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: DesignSystem.Spacing.xl) {
                         VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
-                            sectionHeader(title: "IDENTITY")
+                            sectionHeader(title: "PERSONAL DETAILS")
                             
                             VStack(spacing: 12) {
-                                customField(title: "FULL NAME", text: $viewModel.name)
-                                customField(title: "EMAIL ADDRESS", text: $viewModel.email, keyboard: .emailAddress)
-                                customField(title: "PHONE NUMBER", text: $viewModel.phone, keyboard: .phonePad)
+                                customField(title: "FULL NAME", placeholder: "Your full name", text: $viewModel.name)
+                                customField(title: "EMAIL ADDRESS", placeholder: "name@example.com", text: $viewModel.email, keyboard: .emailAddress)
+                                customField(title: "PHONE NUMBER", placeholder: "Phone number", text: $viewModel.phone, keyboard: .phonePad)
                             }
                         }
                         
@@ -47,8 +48,8 @@ struct SignupView: View {
                             sectionHeader(title: "SECURITY")
                             
                             VStack(spacing: 12) {
-                                customSecureField(title: "PASSWORD", text: $viewModel.password)
-                                customField(title: "4-DIGIT PIN", text: $viewModel.pin, keyboard: .numberPad)
+                                customPasswordField(title: "PASSWORD", text: $viewModel.password)
+                                customField(title: "4-DIGIT PIN", placeholder: "Choose a 4-digit PIN", text: $viewModel.pin, keyboard: .numberPad)
                             }
                         }
                     }
@@ -58,13 +59,7 @@ struct SignupView: View {
                 // Footer
                 VStack(spacing: DesignSystem.Spacing.md) {
                     if let error = viewModel.errorMessage {
-                        Text(error.uppercased())
-                            .font(DesignSystem.Typography.caption)
-                            .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
-                            .padding(8)
-                            .frame(maxWidth: .infinity)
-                            .background(DesignSystem.Colors.surface(scheme))
-                            .cornerRadius(4)
+                        FriendlyErrorBanner(message: error)
                             .padding(.horizontal, DesignSystem.Spacing.lg)
                     }
                     
@@ -78,7 +73,7 @@ struct SignupView: View {
                                 ProgressView()
                                     .progressViewStyle(CircularProgressViewStyle(tint: DesignSystem.Colors.background(scheme)))
                             } else {
-                                Text("COMPLETE ENROLLMENT")
+                                Text("Create Account")
                                     .bold()
                             }
                         }
@@ -92,7 +87,7 @@ struct SignupView: View {
                     .disabled(viewModel.isLoading)
                     
                     Button(action: { dismiss() }) {
-                        Text("RETURN TO ACCESS")
+                        Text("ALREADY HAVE AN ACCOUNT? SIGN IN")
                             .font(DesignSystem.Typography.footnote)
                             .bold()
                             .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
@@ -101,7 +96,7 @@ struct SignupView: View {
                 }
             }
         }
-        .onChange(of: viewModel.signupSuccess) { success in
+        .onChange(of: viewModel.signupSuccess) { _, success in
             if success {
                 dismiss()
             }
@@ -114,24 +109,41 @@ struct SignupView: View {
             .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
     }
     
-    private func customField(title: String, text: Binding<String>, keyboard: UIKeyboardType = .default) -> some View {
+    private func customField(title: String, placeholder: String = "", text: Binding<String>, keyboard: UIKeyboardType = .default) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(.system(size: 10, weight: .bold))
                 .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
-            TextField("", text: text)
+            TextField(placeholder, text: text)
                 .textFieldStyle(StreamTextFieldStyle())
                 .keyboardType(keyboard)
         }
     }
     
-    private func customSecureField(title: String, text: Binding<String>) -> some View {
+    private func customPasswordField(title: String, text: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(.system(size: 10, weight: .bold))
                 .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
-            SecureField("", text: text)
-                .textFieldStyle(StreamTextFieldStyle())
+            
+            HStack {
+                if showPassword {
+                    TextField("Enter password", text: text)
+                } else {
+                    SecureField("Enter password", text: text)
+                }
+                
+                Button(action: { showPassword.toggle() }) {
+                    Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
+                        .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
+                        .padding(.trailing, 4)
+                }
+            }
+            .padding()
+            .background(DesignSystem.Colors.surface(scheme))
+            .cornerRadius(DesignSystem.Spacing.cornerRadiusCard)
+            .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
+            .font(DesignSystem.Typography.callout)
         }
     }
 }
