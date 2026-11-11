@@ -1,0 +1,7 @@
+.build/
+.swiftpm/
+.env
+.git/
+.DS_Store
+Tests/
+

@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: stream-backend
+    env: docker
+    dockerfilePath: Backend/Dockerfile
+    dockerContext: Backend
+    plan: free
+    region: frankfurt # or oregon / ohio
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: stream-postgres
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: QR_SECRET
+        generateValue: true
+      - key: MAIL_HOST
+        value: "smtp.gmail.com"
+      - key: SMTP_USERNAME
+        sync: false # Set in Render Dashboard
+      - key: SMTP_PASSWORD
+        sync: false # Set in Render Dashboard
+
+databases:
+  - name: stream-postgres
+    plan: free
+    databaseName: stream_db
+    user: stream_user
+    region: frankfurt
+

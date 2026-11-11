@@ -7,7 +7,7 @@ import JWT
 public func configure(_ app: Application) async throws {
 
     app.http.server.configuration.hostname = "0.0.0.0"
-    app.http.server.configuration.port = 8080
+    app.http.server.configuration.port = Environment.get("PORT").flatMap(Int.init) ?? 8080
 
 
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
@@ -25,19 +25,23 @@ public func configure(_ app: Application) async throws {
     decoder.dateDecodingStrategy = .iso8601
     ContentConfiguration.global.use(decoder: decoder, for: .json)
 
-    let hostname = Environment.get("DB_HOST") ?? "localhost"
-    let port = Environment.get("DB_PORT").flatMap(Int.init) ?? 5432
-    let username = Environment.get("DB_USERNAME") ?? "postgres"
-    let password = Environment.get("DB_PASSWORD") ?? "tequiero2024"
-    let database = Environment.get("DB_NAME") ?? "TUngaDB"
+    if let databaseURL = Environment.get("DATABASE_URL"), !databaseURL.isEmpty {
+        try app.databases.use(.postgres(url: databaseURL), as: .psql)
+    } else {
+        let hostname = Environment.get("DB_HOST") ?? "localhost"
+        let port = Environment.get("DB_PORT").flatMap(Int.init) ?? 5432
+        let username = Environment.get("DB_USERNAME") ?? "postgres"
+        let password = Environment.get("DB_PASSWORD") ?? "tequiero2024"
+        let database = Environment.get("DB_NAME") ?? "TUngaDB"
 
-    app.databases.use(.postgres(
-        hostname: hostname,
-        port: port,
-        username: username,
-        password: password,
-        database: database
-    ), as: .psql)
+        app.databases.use(.postgres(
+            hostname: hostname,
+            port: port,
+            username: username,
+            password: password,
+            database: database
+        ), as: .psql)
+    }
 
 
     app.migrations.add(CreateUser())
