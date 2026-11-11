@@ -36,9 +36,13 @@ struct UserController: RouteCollection, Sendable {
         let user = try getUser(req: req)
         let input = try req.content.decode(UpdateProfileRequest.self)
         
-        user.name = input.name
-        user.phone = input.phone
-        user.avatarUrl = input.avatarUrl
+        let validatedName = try InputValidator.validateName(input.name)
+        let validatedPhone = try InputValidator.validatePhone(input.phone)
+        let validatedAvatar = try InputValidator.validateUrl(input.avatarUrl)
+        
+        user.name = validatedName
+        user.phone = validatedPhone
+        user.avatarUrl = validatedAvatar
         try await user.save(on: req.db)
         
         return StreamResponse(success: true, message: "Profile updated successfully")
@@ -48,15 +52,18 @@ struct UserController: RouteCollection, Sendable {
         let user = try getUser(req: req)
         let input = try req.content.decode(ChangePinRequest.self)
         
-        guard user.pin == input.oldPin else {
-            throw Abort(.unauthorized, reason: "Incorrect old PIN")
+        let validatedOldPin = try InputValidator.validatePin(input.oldPin, fieldName: "Current PIN")
+        let validatedNewPin = try InputValidator.validatePin(input.newPin, fieldName: "New PIN")
+        
+        guard user.pin == validatedOldPin else {
+            throw Abort(.unauthorized, reason: "Current PIN is incorrect. Please try again.")
         }
         
-        guard input.newPin.count == 4 && input.newPin.allSatisfy({ $0.isNumber }) else {
-            throw Abort(.badRequest, reason: "PIN must be 4 digits")
+        guard validatedNewPin != validatedOldPin else {
+            throw Abort(.badRequest, reason: "New PIN must be different from your current PIN.")
         }
         
-        user.pin = input.newPin
+        user.pin = validatedNewPin
         try await user.save(on: req.db)
         
         return StreamResponse(success: true, message: "PIN changed successfully")

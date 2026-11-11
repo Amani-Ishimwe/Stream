@@ -66,11 +66,7 @@ struct CardsView: View {
                     
                     HStack(spacing: DesignSystem.Spacing.md) {
                         CardActionBtn(title: "LIMITS", icon: "slider.horizontal.3", isActive: true) {
-                            if let first = viewModel.institutions.first {
-                                dailyLimit = "\(Int(first.dailyLimit ?? 1000000))"
-                                monthlyLimit = "\(Int(first.monthlyLimit ?? 5000000))"
-                                showLimitEdit = true
-                            }
+                            showLimitEdit = true
                         }
                         CardActionBtn(title: "REQUEST", icon: "arrow.down.to.line.compact", isActive: true) {
                             showRequestFlow = true
@@ -91,20 +87,12 @@ struct CardsView: View {
             QRPaymentFlow(payload: payload)
         }
         .sheet(isPresented: $showRequestFlow) {
-            RequestMoneyFlow()
+            RequestMoneyFlow(preSelectedDestination: viewModel.institutions.first)
         }
-        .sheet(isPresented: $showLimitEdit) {
-            if let first = viewModel.institutions.first {
-                LimitEditView(daily: $dailyLimit, monthly: $monthlyLimit) {
-                    Task {
-                        let d = Double(dailyLimit) ?? (first.dailyLimit ?? 1000000)
-                        let m = Double(monthlyLimit) ?? (first.monthlyLimit ?? 5000000)
-                        _ = try? await APIService.shared.updateLimits(id: first.id, daily: d, monthly: m)
-                        await viewModel.refreshData()
-                        showLimitEdit = false
-                    }
-                }
-            }
+        .sheet(isPresented: $showLimitEdit, onDismiss: {
+            Task { await viewModel.refreshData() }
+        }) {
+            AccountLimitsView()
         }
         .alert("Invalid QR Code", isPresented: $showDecodeError) {
             Button("OK", role: .cancel) { }

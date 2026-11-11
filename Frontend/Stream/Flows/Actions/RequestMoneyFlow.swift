@@ -5,6 +5,8 @@ struct RequestMoneyFlow: View {
     var preSelectedDestination: Institution? = nil
     @StateObject private var viewModel = TransactionViewModel()
     @State private var qrCodeGenerated = false
+    @State private var availableInstitutions: [Institution] = []
+    @State private var amountText: String = ""
     @Environment(\.presentationMode) var presentationMode
     @Environment(\.colorScheme) var scheme
     
@@ -29,13 +31,18 @@ struct RequestMoneyFlow: View {
         .onAppear {
             if let dest = preSelectedDestination {
                 viewModel.selectedDestination = dest
-            } else {
-                // Default to first linked institution
-                Task {
+            }
+            Task {
+                do {
                     let response = try await APIService.shared.fetchInstitutions()
-                    if let first = response.data?.first {
-                        viewModel.selectedDestination = first
+                    if let list = response.data, !list.isEmpty {
+                        self.availableInstitutions = list
+                        if viewModel.selectedDestination == nil {
+                            viewModel.selectedDestination = list.first
+                        }
                     }
+                } catch {
+                    print("Failed to fetch accounts for request: \(error)")
                 }
             }
         }
@@ -59,26 +66,104 @@ struct RequestMoneyFlow: View {
     
     private var inputStep: some View {
         VStack(spacing: DesignSystem.Spacing.xl) {
+            if let err = viewModel.errorMessage {
+                FriendlyErrorBanner(message: err)
+                    .padding(.horizontal, DesignSystem.Spacing.lg)
+            }
+            
             VStack(alignment: .leading, spacing: DesignSystem.Spacing.lg) {
+                // Account selector
+                VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
+                    Text("RECEIVE INTO ACCOUNT")
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
+                    
+                    if availableInstitutions.isEmpty {
+                        HStack {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Loading accounts...")
+                                .font(DesignSystem.Typography.footnote)
+                                .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(DesignSystem.Colors.surface(scheme))
+                        .cornerRadius(DesignSystem.Spacing.cornerRadiusButton)
+                    } else {
+                        Menu {
+                            ForEach(availableInstitutions) { inst in
+                                Button(action: {
+                                    viewModel.selectedDestination = inst
+                                }) {
+                                    HStack {
+                                        Text(inst.name)
+                                        if viewModel.selectedDestination?.id == inst.id {
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: viewModel.selectedDestination?.iconSymbol ?? "building.columns.fill")
+                                    .font(.system(size: 18))
+                                    .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
+                                    .frame(width: 36, height: 36)
+                                    .background(DesignSystem.Colors.background(scheme))
+                                    .clipShape(Circle())
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(viewModel.selectedDestination?.name ?? "Select Account")
+                                        .font(DesignSystem.Typography.headline)
+                                        .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
+                                    
+                                    if let balance = viewModel.selectedDestination?.balance {
+                                        Text("Balance: \(Int(balance)) RWF")
+                                            .font(DesignSystem.Typography.caption)
+                                            .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
+                                    }
+                                }
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
+                            }
+                            .padding()
+                            .background(DesignSystem.Colors.surface(scheme))
+                            .cornerRadius(DesignSystem.Spacing.cornerRadiusButton)
+                        }
+                    }
+                }
+                
                 VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
                     Text("AMOUNT")
                         .font(DesignSystem.Typography.caption)
                         .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
                     
-                    TextField("0", value: $viewModel.amount, format: .number)
+                    TextField("0", text: $amountText)
                         .font(DesignSystem.Typography.title)
                         .padding()
                         .background(DesignSystem.Colors.surface(scheme))
                         .cornerRadius(DesignSystem.Spacing.cornerRadiusButton)
                         .keyboardType(.numberPad)
+                        .onChange(of: amountText) { _, newValue in
+                            let digits = newValue.filter { "0123456789".contains($0) }
+                            if digits != newValue {
+                                amountText = digits
+                            }
+                            viewModel.amount = Double(digits) ?? 0
+                        }
                 }
                 
                 VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
-                    Text("PAYER (NAME OR PHONE)")
+                    Text("PAYER OR NOTE (OPTIONAL)")
                         .font(DesignSystem.Typography.caption)
                         .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
                     
-                    TextField("Enter name or phone", text: $viewModel.payer)
+                    TextField("e.g. Eric, Lunch, or leave blank", text: $viewModel.payer)
                         .font(DesignSystem.Typography.subheadline)
                         .padding()
                         .background(DesignSystem.Colors.surface(scheme))
@@ -97,9 +182,9 @@ struct RequestMoneyFlow: View {
                     }
                 }
             }
-            .buttonStyle(PrimaryButtonStyle(isEnabled: viewModel.amount > 0 && !viewModel.payer.isEmpty))
+            .buttonStyle(PrimaryButtonStyle(isEnabled: viewModel.amount > 0))
             .padding()
-            .disabled(viewModel.amount <= 0 || viewModel.payer.isEmpty)
+            .disabled(viewModel.amount <= 0)
         }
     }
     
@@ -125,12 +210,31 @@ struct RequestMoneyFlow: View {
                             .frame(width: 200, height: 200)
                     }
                     
-                    VStack(spacing: 4) {
+                    VStack(spacing: 6) {
                         Text("\(Int(viewModel.amount)) RWF")
                             .font(DesignSystem.Typography.balanceSmall)
-                        Text("REQUESTING FROM \(viewModel.payer.uppercased())")
-                            .font(DesignSystem.Typography.caption)
-                            .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
+                        
+                        if let destName = viewModel.selectedDestination?.name {
+                            HStack(spacing: 6) {
+                                Image(systemName: "arrow.down.circle.fill")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
+                                Text("Depositing to \(destName)")
+                                    .font(DesignSystem.Typography.footnote)
+                                    .bold()
+                                    .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
+                            }
+                        }
+                        
+                        if !viewModel.payer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            Text("REQUESTING FROM \(viewModel.payer.uppercased())")
+                                .font(DesignSystem.Typography.caption)
+                                .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
+                        } else {
+                            Text("SCAN TO PAY")
+                                .font(DesignSystem.Typography.caption)
+                                .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
+                        }
                     }
                 }
             }
@@ -154,6 +258,8 @@ struct RequestMoneyFlow: View {
               let jsonData = try? encoder.encode(payload),
               let jsonString = String(data: jsonData, encoding: .utf8) else { return }
         
+        let payerNote = viewModel.payer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Payment Request" : "From: \(viewModel.payer)"
+        
         let qrView = VStack(spacing: 16) {
             Text("STREAM PAYMENT REQUEST")
                 .font(.headline)
@@ -164,7 +270,7 @@ struct RequestMoneyFlow: View {
             Text("\(Int(viewModel.amount)) RWF")
                 .font(.title3)
                 .bold()
-            Text("From: \(viewModel.payer)")
+            Text(payerNote)
                 .font(.subheadline)
         }
         .padding(40)

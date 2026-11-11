@@ -26,11 +26,21 @@ public struct EmailService: Sendable {
         let cleanedUser = username.replacingOccurrences(of: "\"", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanedPass = password.replacingOccurrences(of: "\"", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
         
+        // Prevent SMTP header injection
+        let cleanRecipient = recipient
+            .replacingOccurrences(of: "\r", with: "")
+            .replacingOccurrences(of: "\n", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanSubject = subject
+            .replacingOccurrences(of: "\r", with: "")
+            .replacingOccurrences(of: "\n", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        
         let contentType = isHtml ? "text/html; charset=UTF-8" : "text/plain; charset=UTF-8"
         let emailContent = """
         From: Stream Banking <\(cleanedUser)>
-        To: <\(recipient)>
-        Subject: \(subject)
+        To: <\(cleanRecipient)>
+        Subject: \(cleanSubject)
         MIME-Version: 1.0
         Content-Type: \(contentType)
 
@@ -44,7 +54,7 @@ public struct EmailService: Sendable {
             "--ssl-reqd",
             "--user", "\(cleanedUser):\(cleanedPass)",
             "--mail-from", cleanedUser,
-            "--mail-rcpt", recipient,
+            "--mail-rcpt", cleanRecipient,
             "--silent",
             "--show-error",
             "--upload-file", "-"

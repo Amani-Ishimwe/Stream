@@ -173,6 +173,10 @@ final class TransactionService: Sendable {
 
     // Dispatcher for QR-originated transactions
     func performQRTransaction(user: User, payload: QRPayload, overrideSourceID: UUID? = nil, on db: Database) async throws -> TransactionResult {
+        guard payload.amount.isFinite && !payload.amount.isNaN && payload.amount >= 0 && payload.amount <= 50_000_000 else {
+            throw Abort(.badRequest, reason: "Invalid transaction amount.")
+        }
+        
         switch payload.type {
         case .send:
             let sourceId = overrideSourceID ?? payload.sourceId
@@ -205,6 +209,16 @@ final class TransactionService: Sendable {
                         .filter(\.$institution.$id == sid)
                         .first() else {
                         throw Abort(.notFound, reason: "Your source account not found.")
+                    }
+                    
+                    guard !sourceAccount.isFrozen else {
+                        throw Abort(.forbidden, reason: "Your source account is frozen.")
+                    }
+                    
+                    let today = Calendar.current.startOfDay(for: Date())
+                    let dailySpent = try await self.getSpentAmount(userID: userID, sourceID: sid, since: today, on: transactionDB)
+                    if dailySpent + payload.amount > sourceAccount.dailyLimit {
+                        throw Abort(.forbidden, reason: "Daily limit of \(Int(sourceAccount.dailyLimit)) RWF exceeded.")
                     }
                     
                     guard sourceAccount.balance >= payload.amount else {

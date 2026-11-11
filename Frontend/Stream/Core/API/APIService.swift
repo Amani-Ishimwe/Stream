@@ -116,6 +116,9 @@ class APIService: ObservableObject {
         }
         
         if httpResponse.statusCode == 401 {
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: .userSessionExpired, object: nil)
+            }
             throw APIError.unauthorized
         }
         
@@ -128,6 +131,11 @@ class APIService: ObservableObject {
             // First check Vapor error response format: {"error": true, "reason": "..."}
             if let vaporError = try? decoder.decode(VaporErrorResponse.self, from: data),
                let reason = vaporError.reason, !reason.isEmpty {
+                if reason.localizedCaseInsensitiveContains("session") || reason.localizedCaseInsensitiveContains("unauthorized") {
+                    DispatchQueue.main.async {
+                        NotificationCenter.default.post(name: .userSessionExpired, object: nil)
+                    }
+                }
                 throw APIError.serverError(reason)
             }
             // Next check StreamResponse wrapper format: {"message": "..."}

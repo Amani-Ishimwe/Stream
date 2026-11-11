@@ -27,15 +27,18 @@ struct SettingsView: View {
                             VStack(spacing: 1) {
                                 SettingToggleRow(icon: "faceid", title: "BIOMETRIC AUTH", isOn: $isFaceIDEnabled)
                                 SettingToggleRow(icon: "bell.badge", title: "PUSH NOTIFICATIONS", isOn: $isPushEnabled)
-                                SettingActionRow(icon: "circle.lefthalf.filled", title: "TOGGLE DARK MODE") {
-                                    withAnimation {
-                                        if appState.colorSchemeOverride == .dark {
-                                            appState.colorSchemeOverride = .light
-                                        } else {
-                                            appState.colorSchemeOverride = .dark
+                                SettingToggleRow(
+                                    icon: (appState.colorSchemeOverride ?? (scheme == .dark ? .dark : .light)) == .dark ? "moon.fill" : "sun.max.fill",
+                                    title: "DARK THEME",
+                                    isOn: Binding(
+                                        get: { (appState.colorSchemeOverride ?? (scheme == .dark ? .dark : .light)) == .dark },
+                                        set: { isDark in
+                                            withAnimation(.spring()) {
+                                                appState.colorSchemeOverride = isDark ? .dark : .light
+                                            }
                                         }
-                                    }
-                                }
+                                    )
+                                )
                             }
                             .background(DesignSystem.Colors.surface(scheme))
                             .cornerRadius(DesignSystem.Spacing.cornerRadiusCard)
@@ -139,9 +142,11 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(appState.currentUser?.name.uppercased() ?? "USER NAME")
                     .font(DesignSystem.Typography.headline)
-                Text(appState.currentUser?.email ?? "email@example.com")
-                    .font(DesignSystem.Typography.caption)
-                    .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
+                if let email = appState.currentUser?.email, !email.isEmpty {
+                    Text(email)
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundColor(DesignSystem.Colors.textSecondary(scheme))
+                }
             }
             Spacer()
             
@@ -156,6 +161,15 @@ struct SettingsView: View {
             .buttonStyle(.plain)
         }
         .padding(.horizontal, DesignSystem.Spacing.lg)
+        .onAppear {
+            if appState.currentUser == nil {
+                Task {
+                    if let user = try? await APIService.shared.fetchProfile().data {
+                        appState.currentUser = user
+                    }
+                }
+            }
+        }
     }
 }
 

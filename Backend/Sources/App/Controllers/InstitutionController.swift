@@ -26,17 +26,18 @@ struct InstitutionController: RouteCollection {
         let userId = try user.requireID()
         let instID = try req.parameters.require("institutionID", as: UUID.self)
         let input = try req.content.decode(UpdateLimitsRequest.self)
+        let validatedLimits = try InputValidator.validateLimits(daily: input.dailyLimit, monthly: input.monthlyLimit)
         
         guard let linked = try await LinkedAccount.query(on: req.db)
             .filter(\.$user.$id == userId)
             .filter(\.$institution.$id == instID)
             .with(\.$institution)
             .first() else {
-            throw Abort(.notFound)
+            throw Abort(.notFound, reason: "Account not found.")
         }
         
-        linked.dailyLimit = input.dailyLimit
-        linked.monthlyLimit = input.monthlyLimit
+        linked.dailyLimit = validatedLimits.daily
+        linked.monthlyLimit = validatedLimits.monthly
         try await linked.save(on: req.db)
         
         return StreamResponse(success: true, message: "Limits updated successfully", data: InstitutionDTO(linked: linked))
@@ -77,11 +78,16 @@ struct InstitutionController: RouteCollection {
             throw Abort(.notFound, reason: "Institution not found")
         }
         
+        var initialBalance: Double = 0.0
+        if let bal = input.balance {
+            initialBalance = try InputValidator.validateAmount(bal, min: 0.0, max: 100_000_000.0, fieldName: "Initial balance")
+        }
+        
         let newLinked = LinkedAccount(
             userID: userId,
             institutionID: input.institutionId,
             accountNumber: "STREAM-\(Int.random(in: 1000...9999))-\(Int.random(in: 1000...9999))",
-            balance: input.balance ?? 0.0,
+            balance: initialBalance,
             dailyLimit: 2000000,
             monthlyLimit: 10000000
         )

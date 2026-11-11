@@ -137,13 +137,31 @@ struct DashboardView: View {
             }
             Spacer()
             
-            Button(action: { Task { await viewModel.refreshData() } }) {
-                Image(systemName: "arrow.triangle.2.circlepath")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
-                    .padding(DesignSystem.Spacing.sm)
-                    .background(DesignSystem.Colors.surface(scheme))
-                    .clipShape(Circle())
+            HStack(spacing: 12) {
+                // Theme Toggle (Dark / Light Mode)
+                Button(action: {
+                    withAnimation(.spring()) {
+                        let currentIsDark = (appState.colorSchemeOverride ?? (scheme == .dark ? .dark : .light)) == .dark
+                        appState.colorSchemeOverride = currentIsDark ? .light : .dark
+                    }
+                }) {
+                    let isDark = (appState.colorSchemeOverride ?? (scheme == .dark ? .dark : .light)) == .dark
+                    Image(systemName: isDark ? "sun.max.fill" : "moon.fill")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(isDark ? Color.yellow : DesignSystem.Colors.textPrimary(scheme))
+                        .padding(DesignSystem.Spacing.sm)
+                        .background(DesignSystem.Colors.surface(scheme))
+                        .clipShape(Circle())
+                }
+                
+                Button(action: { Task { await viewModel.refreshData() } }) {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(DesignSystem.Colors.textPrimary(scheme))
+                        .padding(DesignSystem.Spacing.sm)
+                        .background(DesignSystem.Colors.surface(scheme))
+                        .clipShape(Circle())
+                }
             }
         }
         .padding(.horizontal, DesignSystem.Spacing.lg)

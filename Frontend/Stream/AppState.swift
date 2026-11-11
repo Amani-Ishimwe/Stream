@@ -2,6 +2,10 @@ import SwiftUI
 import Foundation
 import Combine
 
+extension Notification.Name {
+    static let userSessionExpired = Notification.Name("StreamUserSessionExpired")
+}
+
 class AppState: ObservableObject {
     @Published var currentUser: UserProfile?
     @Published var isAuthenticated: Bool = false
@@ -16,6 +20,8 @@ class AppState: ObservableObject {
         }
     }
     
+    private var cancellables = Set<AnyCancellable>()
+    
     // Auth Session
     var token: String? {
         UserDefaults.standard.string(forKey: "stream_auth_token")
@@ -25,15 +31,37 @@ class AppState: ObservableObject {
         if let savedTheme = UserDefaults.standard.string(forKey: "stream_theme") {
             self._colorSchemeOverride = Published(initialValue: savedTheme == "dark" ? .dark : .light)
         }
+        
+        NotificationCenter.default.publisher(for: .userSessionExpired)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.logout()
+            }
+            .store(in: &cancellables)
+        
         checkAuth()
     }
     
     func checkAuth() {
-        if let token = token {
-            // Ideally verify token here or let SplashView handle it
-            self.isAuthenticated = true
-        } else {
+        guard let _ = token else {
             self.isAuthenticated = false
+            self.currentUser = nil
+            return
+        }
+        
+        Task { @MainActor in
+            do {
+                let response = try await APIService.shared.fetchProfile()
+                if let profile = response.data {
+                    self.currentUser = profile
+                    self.isAuthenticated = true
+                } else {
+                    self.logout()
+                }
+            } catch {
+                print("Session verification failed on launch: \(error)")
+                self.logout()
+            }
         }
     }
     

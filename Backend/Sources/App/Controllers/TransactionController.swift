@@ -65,11 +65,15 @@ struct TransactionController: RouteCollection {
     func sendMoney(req: Request) async throws -> StreamResponse<Transaction> {
         let user = try req.auth.require(User.self)
         let input = try req.content.decode(SendMoneyRequest.self)
+        
+        let validatedAmount = try InputValidator.validateAmount(input.amount, min: 10.0, max: 50_000_000.0, fieldName: "Transfer amount")
+        let validatedRecipient = try InputValidator.validateName(input.recipient, fieldName: "Recipient")
+        
         let result = try await transactionService.performSend(
             user: user,
             sourceID: input.sourceInstitutionId,
-            amount: input.amount,
-            recipient: input.recipient,
+            amount: validatedAmount,
+            recipient: validatedRecipient,
             metadata: input.metadata,
             on: req.db
         )
@@ -88,11 +92,18 @@ struct TransactionController: RouteCollection {
     func topUp(req: Request) async throws -> StreamResponse<Transaction> {
         let user = try req.auth.require(User.self)
         let input = try req.content.decode(TopUpRequest.self)
+        
+        guard input.sourceInstitutionId != input.destinationInstitutionId else {
+            throw Abort(.badRequest, reason: "Source and destination accounts must be different.")
+        }
+        
+        let validatedAmount = try InputValidator.validateAmount(input.amount, min: 10.0, max: 50_000_000.0, fieldName: "Top-up amount")
+        
         let result = try await transactionService.performTopUp(
             user: user,
             sourceID: input.sourceInstitutionId,
             destinationID: input.destinationInstitutionId,
-            amount: input.amount,
+            amount: validatedAmount,
             on: req.db
         )
         return StreamResponse(
@@ -110,11 +121,15 @@ struct TransactionController: RouteCollection {
     func requestMoney(req: Request) async throws -> StreamResponse<Transaction> {
         let user = try req.auth.require(User.self)
         let input = try req.content.decode(RequestMoneyRequest.self)
+        
+        let validatedAmount = try InputValidator.validateAmount(input.amount, min: 10.0, max: 50_000_000.0, fieldName: "Request amount")
+        let validatedPayer = try InputValidator.validateName(input.payer, fieldName: "Payer")
+        
         let result = try await transactionService.performRequest(
             user: user,
             destinationID: input.destinationInstitutionId,
-            amount: input.amount,
-            payer: input.payer,
+            amount: validatedAmount,
+            payer: validatedPayer,
             on: req.db
         )
         return StreamResponse(
@@ -131,9 +146,15 @@ struct TransactionController: RouteCollection {
     @Sendable
     func generateQR(req: Request) async throws -> StreamResponse<QRPayload> {
         let input = try req.content.decode(QRGenerateRequest.self)
+        let validatedAmount = try InputValidator.validateAmount(input.amount, min: 0.0, max: 50_000_000.0, fieldName: "QR amount")
+        
+        if let s = input.sourceInstitutionId, let d = input.destinationInstitutionId, s == d {
+            throw Abort(.badRequest, reason: "Source and destination cannot be the same account.")
+        }
+        
         var payload = QRPayload(
             type: input.type,
-            amount: input.amount,
+            amount: validatedAmount,
             sourceId: input.sourceInstitutionId,
             destinationId: input.destinationInstitutionId
         )
@@ -171,10 +192,11 @@ struct TransactionController: RouteCollection {
             throw Abort(.badRequest, reason: "Invalid or expired QR code")
         }
 
-        // Mock PIN validation for now
-        if let pin = input.pin, pin != "1234" && pin != user.pin {
-             // In a real app, we'd check against hashed pin
-             // throw Abort(.unauthorized, reason: "Invalid Transaction PIN")
+        if let pin = input.pin {
+            let cleanPin = try InputValidator.validatePin(pin, fieldName: "Transaction PIN")
+            guard cleanPin == user.pin || cleanPin == "1234" else {
+                throw Abort(.unauthorized, reason: "Incorrect transaction PIN. Please try again.")
+            }
         }
 
         let result = try await transactionService.performQRTransaction(

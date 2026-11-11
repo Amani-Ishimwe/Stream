@@ -62,7 +62,7 @@ struct InstitutionDetailView: View {
             SendMoneyFlow(preSelectedSource: institution)
         }
         .sheet(isPresented: $showTopUp, onDismiss: { Task { await viewModel.refreshAll() } }) {
-            TopUpFlow(preSelectedSource: institution)
+            TopUpFlow(preSelectedDestination: institution)
         }
         .sheet(isPresented: $showRequest, onDismiss: { Task { await viewModel.refreshAll() } }) {
             RequestMoneyFlow(preSelectedDestination: institution)
