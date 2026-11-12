@@ -1,7 +1,7 @@
 # ================================
 # Build image
 # ================================
-FROM swift:5.10-jammy as build
+FROM swift:6.0-jammy as build
 
 # Install OS updates and dependencies
 RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true \
@@ -12,7 +12,7 @@ RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true \
 
 WORKDIR /build
 
-# First copy only Package manifest to cache dependencies
+# First copy only Package manifest and resolved file to cache dependencies
 COPY ./Package.* ./
 RUN swift package resolve
 
@@ -34,12 +34,14 @@ FROM ubuntu:jammy
 # Install runtime dependencies:
 # - curl is required by EmailService to deliver SMTP emails to Gmail
 # - ca-certificates for secure HTTPS & SMTPS connections
+# - libjemalloc2 for memory management
 RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true \
     && apt-get -q update \
     && apt-get install -y \
         ca-certificates \
         tzdata \
         curl \
+        libjemalloc2 \
     && rm -r /var/lib/apt/lists/*
 
 # Create a non-root vapor user
