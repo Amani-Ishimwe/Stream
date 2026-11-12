@@ -79,7 +79,7 @@ struct BalanceUpdate: Decodable {
 class APIService: ObservableObject {
     static let shared = APIService()
     
-    private let baseURL = "http://10.12.75.134:8080"
+    private let baseURL = "https://stream-backend-21x2.onrender.com"
     
     // Auth Session (managed by AppState, but APIService needs it for headers)
     private var token: String? {
