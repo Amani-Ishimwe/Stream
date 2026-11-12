@@ -26,6 +26,7 @@ public func configure(_ app: Application) async throws {
     ContentConfiguration.global.use(decoder: decoder, for: .json)
 
     if let databaseURL = Environment.get("DATABASE_URL"), !databaseURL.isEmpty {
+        app.logger.info("Configuring PostgreSQL connection using DATABASE_URL...")
         try app.databases.use(.postgres(url: databaseURL), as: .psql)
     } else {
         let hostname = Environment.get("DB_HOST") ?? "localhost"
@@ -34,6 +35,7 @@ public func configure(_ app: Application) async throws {
         let password = Environment.get("DB_PASSWORD") ?? "tequiero2024"
         let database = Environment.get("DB_NAME") ?? "TUngaDB"
 
+        app.logger.warning("DATABASE_URL environment variable is not set. Falling back to default host: \(hostname):\(port)")
         app.databases.use(.postgres(
             hostname: hostname,
             port: port,
